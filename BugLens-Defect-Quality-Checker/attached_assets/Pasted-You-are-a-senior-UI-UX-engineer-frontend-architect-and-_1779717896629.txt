@@ -1,0 +1,242 @@
+You are a senior UI/UX engineer, frontend architect, and full-stack developer.
+
+I want you to build a COMPLETE production-grade web application called:
+
+"BugLens — Defect Quality Checker"
+
+IMPORTANT:
+This project MUST be an EXACT VISUAL CLONE of the provided HTML/CSS design system.
+
+DO NOT redesign it.
+DO NOT simplify the UI.
+DO NOT use default framework styling.
+
+The application should visually match the uploaded BugLens UI almost 1:1.
+
+====================================================
+TECH STACK RULE
+====================================================
+
+Use ONLY ONE of these:
+
+1. Python + Streamlit
+OR
+2. React + Node.js
+
+Preferred:
+Python + Streamlit
+
+DO NOT use:
+- Django
+- Flask
+- Angular
+- Vue
+- Bootstrap
+- Tailwind
+- Material UI
+
+====================================================
+UI CLONE REQUIREMENT
+====================================================
+
+The UI MUST exactly replicate the uploaded BugLens design system:
+
+Color Palette:
+- Background: #f5f2ee
+- Surface cards: #fffefb
+- Borders: #d4cfc5
+- Primary text: #1a1714
+- Secondary text: #7a756e
+- Accent orange: #c4410c
+- Accent green: #1d6b4e
+- Accent blue: #1e4b8a
+- Warning amber: #b5830a
+
+Typography:
+- Instrument Serif
+- Outfit
+- DM Mono
+
+Design Language:
+- Editorial luxury SaaS aesthetic
+- Minimal premium dashboard
+- Soft shadows
+- Rounded cards
+- Thin borders
+- Elegant spacing
+- Smooth transitions
+- Glassmorphism-inspired panels
+- Professional QA enterprise feel
+
+====================================================
+EXACT COMPONENTS TO CLONE
+====================================================
+
+Clone ALL these sections exactly:
+
+1. Login Page
+- Dark animated background
+- Grid overlay
+- Floating radial gradients
+- Demo account cards
+- Rounded login card
+- Elegant typography
+
+2. Top Navigation Bar
+- Sticky navbar
+- Logo
+- Tabs
+- User chip
+- Logout button
+
+3. Analyzer Page
+- Report identity card
+- Reproduction card
+- Context & classification card
+- Live completeness bar
+- Analyze button
+- Professional spacing
+
+4. Results Dashboard
+- Circular score ring
+- Section score cards
+- Exception analysis cards
+- AI recommendation cards
+- Rewrite report panel
+- Download buttons
+
+5. Compare View
+- Side-by-side comparison panels
+- Score comparison bars
+
+6. History View
+- Analysis history cards
+- Grade badges
+- Metadata styling
+
+7. Dashboard View
+- Analytics cards
+- Trend graphs
+- Aggregate metrics
+
+====================================================
+APPLICATION FUNCTIONALITY
+====================================================
+
+The app must:
+- Analyze defect quality
+- Generate quality score
+- Detect missing information
+- Provide rewrite suggestions
+- Detect weak wording
+- Generate professional rewrite
+- Parse stack traces
+- Detect exception types
+- Provide downloadable reports
+
+====================================================
+SCORING SYSTEM
+====================================================
+
+Implement weighted scoring:
+
+- Title clarity → 20
+- Description quality → 20
+- Reproduction steps → 20
+- Expected vs actual → 15
+- Environment details → 15
+- Severity → 5
+- Attachments → 5
+
+Total = 100
+
+====================================================
+AI ANALYSIS
+====================================================
+
+The system should:
+- Analyze defect reports
+- Generate suggestions
+- Detect vague wording
+- Recommend fixes
+- Generate rewritten defect reports
+- Detect QA gaps
+
+Support:
+- OpenAI
+- Claude
+- Gemini
+- OpenRouter APIs
+
+Application must also work WITHOUT API key using:
+- Rule-based analysis
+- Regex
+- NLP heuristics
+
+====================================================
+ANIMATION REQUIREMENTS
+====================================================
+
+Include:
+- Fade-in animations
+- Smooth transitions
+- Progress animations
+- Loading spinners
+- Animated score ring
+- Hover effects
+- Toast notifications
+
+====================================================
+STREAMLIT REQUIREMENT
+====================================================
+
+If using Streamlit:
+- Override default Streamlit theme
+- Use custom CSS extensively
+- Make it visually identical to the HTML version
+- Hide default Streamlit branding
+- Use session state properly
+- Implement pseudo-routing/pages
+- Use responsive layout
+
+====================================================
+REACT REQUIREMENT
+====================================================
+
+If using React:
+- Use clean component architecture
+- Modular folder structure
+- Reusable components
+- Responsive design
+- Proper state management
+
+====================================================
+DELIVERABLES
+====================================================
+
+Generate:
+1. Full source code
+2. Complete folder structure
+3. requirements.txt or package.json
+4. README.md
+5. Setup instructions
+6. Run instructions
+7. API integration guide
+8. Deployment steps
+
+====================================================
+IMPORTANT
+====================================================
+
+The code MUST:
+- Be fully functional
+- Be production-quality
+- Match the uploaded UI design closely
+- Include ALL styling
+- Include ALL functionality
+- Include proper comments
+- Run without modification
+- Have no placeholders
+- Be directly executable
+
+Build the COMPLETE project now.

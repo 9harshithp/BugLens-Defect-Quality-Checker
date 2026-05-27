@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "fQ4vUFjL3Fx6d2r5t-XSo"
+uri = "file://BugLens_PPT_Content.md"
+type = "text"
+title = "BugLens PPT Content — All 12 Slides"
