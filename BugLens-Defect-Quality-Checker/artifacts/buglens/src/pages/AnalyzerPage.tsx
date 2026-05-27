@@ -196,12 +196,18 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
         <div className="bl-field">
           <label className="bl-label">Bug Title <span style={{ color: '#c4410c' }}>*</span></label>
           <input className="bl-input" data-testid="input-title" value={fields.title} onChange={set('title')} placeholder="e.g. Login button unresponsive on Safari 17 with 2FA enabled" />
-          <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.title.length > 20 ? '#1d6b4e' : fields.title.length > 0 ? '#b5830a' : '#a09a92', textAlign: 'right', marginTop: 2 }}>{fields.title.length} chars</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 2 }}>
+            <InlineHint hint={getInlineHint('title', fields.title)} />
+            <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.title.length > 20 ? '#1d6b4e' : fields.title.length > 0 ? '#b5830a' : '#a09a92', flexShrink: 0, paddingLeft: 8 }}>{fields.title.length} chars</div>
+          </div>
         </div>
         <div className="bl-field">
           <label className="bl-label">Description <span style={{ color: '#c4410c' }}>*</span></label>
           <textarea className="bl-textarea" data-testid="input-desc" rows={3} value={fields.desc} onChange={set('desc')} placeholder="What is broken? What is the user impact? Any frequency or pattern?" />
-          <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.desc.length > 20 ? '#1d6b4e' : fields.desc.length > 0 ? '#b5830a' : '#a09a92', textAlign: 'right', marginTop: 2 }}>{fields.desc.length} chars</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 2 }}>
+            <InlineHint hint={getInlineHint('desc', fields.desc)} />
+            <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.desc.length > 20 ? '#1d6b4e' : fields.desc.length > 0 ? '#b5830a' : '#a09a92', flexShrink: 0, paddingLeft: 8 }}>{fields.desc.length} chars</div>
+          </div>
         </div>
       </div>
 
@@ -212,7 +218,10 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
           <label className="bl-label">Steps to Reproduce <span style={{ color: '#c4410c' }}>*</span></label>
           <textarea className="bl-textarea" data-testid="input-steps" rows={4} value={fields.steps} onChange={set('steps')}
             placeholder={'1. Go to the login page\n2. Enter valid credentials\n3. Click Sign In\n4. Observe...'} />
-          <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.steps.length > 20 ? '#1d6b4e' : fields.steps.length > 0 ? '#b5830a' : '#a09a92', textAlign: 'right', marginTop: 2 }}>{fields.steps.length} chars</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 2 }}>
+            <InlineHint hint={getInlineHint('steps', fields.steps)} />
+            <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.steps.length > 20 ? '#1d6b4e' : fields.steps.length > 0 ? '#b5830a' : '#a09a92', flexShrink: 0, paddingLeft: 8 }}>{fields.steps.length} chars</div>
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
           <div className="bl-field" style={{ marginBottom: 0 }}>
@@ -224,6 +233,7 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
             <textarea className="bl-textarea" data-testid="input-actual" rows={2} value={fields.act} onChange={set('act')} placeholder="Button unresponsive. No error shown." />
           </div>
         </div>
+        <InlineHint hint={getInlineHint('exp_act', fields.exp, fields.act)} />
       </div>
 
       {/* Context & Classification */}
@@ -233,6 +243,7 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
           <div className="bl-field" style={{ marginBottom: 0 }}>
             <label className="bl-label">Environment <span style={{ color: '#a09a92', fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '.7rem' }}>(recommended)</span></label>
             <textarea className="bl-textarea" data-testid="input-env" rows={2} value={fields.env} onChange={set('env')} placeholder="macOS 14, Safari 17, App v2.4, Staging" />
+            <InlineHint hint={getInlineHint('env', fields.env)} />
           </div>
           <div className="bl-field" style={{ marginBottom: 0 }}>
             <label className="bl-label">Severity</label>
@@ -338,6 +349,10 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
             result={result}
             title={fields.title}
             excRaw={fields.exc}
+            onShareToTeam={currentHistItem && onShareToTeam
+              ? () => { onShareToTeam(currentHistItem); }
+              : undefined
+            }
             onDownloadTXT={() => {
               downloadFile(result.rewritten_report, `${safeFilename(fields.title)}_report.txt`, 'text/plain');
               toast('⬇ Downloaded TXT');
