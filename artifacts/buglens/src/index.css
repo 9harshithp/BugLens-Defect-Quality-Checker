@@ -403,6 +403,7 @@
   border-radius: 50%; animation: bl-sp .7s linear infinite; flex-shrink: 0;
 }
 @keyframes bl-sp { to { transform: rotate(360deg); } }
+@keyframes bl-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
 /* ── History ───────────────────────────────── */
 .bl-hist-item {

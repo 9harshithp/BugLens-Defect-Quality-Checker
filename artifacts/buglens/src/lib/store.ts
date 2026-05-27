@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { HistoryItem, User, TeamFeedItem, TeamComment } from './types';
 
 const BUILTIN_USERS: Record<string, { password: string; role: string; name: string }> = {
@@ -37,6 +37,17 @@ export function useAppStore() {
   const [user, setUser]         = useState<User | null>(null);
   const [history, setHistory]   = useState<HistoryItem[]>([]);
   const [teamFeed, setTeamFeed] = useState<TeamFeedItem[]>(loadTeamFeedFromStorage);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const fresh = loadTeamFeedFromStorage();
+      setTeamFeed(prev => {
+        if (JSON.stringify(prev) !== JSON.stringify(fresh)) return fresh;
+        return prev;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const resolveUser = (username: string): { password: string; role: string; name: string } | undefined => {
     const builtin = BUILTIN_USERS[username];

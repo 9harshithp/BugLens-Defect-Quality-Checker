@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { gradeMeta, scoreColor, timeAgo } from '../lib/analysis';
 import type { TeamFeedItem, User } from '../lib/types';
+
+const KNOWN_USERS = ['admin', 'qa_lead', 'dev_user', 'analyst'];
+const KNOWN_NAMES: Record<string, string> = {
+  admin: 'Alex Admin', qa_lead: 'Quinn Arora',
+  dev_user: 'Dev Patel', analyst: 'Ana Silva',
+};
 
 interface Props {
   teamFeed: TeamFeedItem[];
@@ -44,6 +50,46 @@ function Avatar({ name, role }: { name: string; role: string }) {
   );
 }
 
+function renderCommentText(text: string) {
+  const parts = text.split(/(@\w+)/g);
+  return parts.map((part, i) =>
+    /^@\w+$/.test(part)
+      ? <span key={i} style={{ color: '#1e4b8a', fontWeight: 600, background: '#e8f0fa', borderRadius: 4, padding: '0 3px' }}>{part}</span>
+      : <span key={i}>{part}</span>
+  );
+}
+
+function MentionDropdown({ query, onSelect }: { query: string; onSelect: (u: string) => void }) {
+  const matches = KNOWN_USERS.filter(u => u.toLowerCase().startsWith(query.toLowerCase()));
+  if (!matches.length) return null;
+  return (
+    <div style={{
+      position: 'absolute', bottom: '100%', left: 0, background: '#fffefb',
+      border: '1px solid #d4cfc5', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,.1)',
+      zIndex: 50, minWidth: 180, overflow: 'hidden', marginBottom: 4,
+    }}>
+      {matches.map(u => (
+        <button key={u} onClick={() => onSelect(u)} style={{
+          display: 'flex', alignItems: 'center', gap: '.55rem', width: '100%',
+          padding: '.5rem .85rem', background: 'none', border: 'none', cursor: 'pointer',
+          textAlign: 'left', fontFamily: "'Outfit', sans-serif",
+        }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ee')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+        >
+          <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#1e4b8a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.75rem', color: '#fff', fontWeight: 700 }}>
+            {KNOWN_NAMES[u]?.[0] ?? u[0]}
+          </div>
+          <div>
+            <div style={{ fontSize: '.8rem', fontWeight: 600, color: '#1a1714' }}>{KNOWN_NAMES[u] ?? u}</div>
+            <div style={{ fontSize: '.65rem', color: '#a09a92', fontFamily: "'DM Mono', monospace" }}>@{u}</div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function FeedCard({ item, currentUser, onAddComment, onRemove }: {
   item: TeamFeedItem;
   currentUser: User;
@@ -53,11 +99,28 @@ function FeedCard({ item, currentUser, onAddComment, onRemove }: {
   const [commentText, setCommentText] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCommentText(val);
+    const match = val.match(/@(\w*)$/);
+    setMentionQuery(match ? match[1] : null);
+  };
+
+  const insertMention = (username: string) => {
+    const replaced = commentText.replace(/@\w*$/, `@${username} `);
+    setCommentText(replaced);
+    setMentionQuery(null);
+    inputRef.current?.focus();
+  };
 
   const handleComment = () => {
     if (!commentText.trim()) return;
     onAddComment(item.id, commentText.trim(), currentUser);
     setCommentText('');
+    setMentionQuery(null);
     setShowComments(true);
   };
 
@@ -67,8 +130,20 @@ function FeedCard({ item, currentUser, onAddComment, onRemove }: {
     .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 3);
 
+  const mentionsInComments = item.comments.filter(c => c.text.includes(`@${currentUser.username}`));
+  const hasMention = mentionsInComments.length > 0;
+
   return (
-    <div className="bl-card" style={{ marginBottom: '1rem' }}>
+    <div className="bl-card" style={{ marginBottom: '1rem', position: 'relative' }}>
+      {hasMention && (
+        <div style={{
+          position: 'absolute', top: 12, right: 12,
+          background: '#1e4b8a', color: '#fff', fontSize: '.62rem',
+          fontFamily: "'DM Mono', monospace", fontWeight: 700,
+          padding: '.18rem .55rem', borderRadius: 20,
+        }}>@you</div>
+      )}
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '.9rem', gap: '.5rem' }}>
         <div style={{ display: 'flex', gap: '.65rem', alignItems: 'flex-start', flex: 1 }}>
@@ -85,7 +160,7 @@ function FeedCard({ item, currentUser, onAddComment, onRemove }: {
         {isOwner && (
           <button
             onClick={() => onRemove(item.id)}
-            style={{ background: 'none', border: 'none', color: '#a09a92', cursor: 'pointer', fontSize: '.75rem', fontFamily: "'DM Mono', monospace", padding: '.2rem .4rem', borderRadius: 6, transition: 'color .12s' }}
+            style={{ background: 'none', border: 'none', color: '#a09a92', cursor: 'pointer', fontSize: '.75rem', fontFamily: "'DM Mono', monospace", padding: '.2rem .4rem', borderRadius: 6, transition: 'color .12s', marginTop: hasMention ? 20 : 0 }}
             onMouseEnter={e => (e.currentTarget.style.color = '#c4410c')}
             onMouseLeave={e => (e.currentTarget.style.color = '#a09a92')}
             title="Remove from feed"
@@ -175,23 +250,30 @@ function FeedCard({ item, currentUser, onAddComment, onRemove }: {
                         <span style={{ fontWeight: 600, fontSize: '.8rem', color: '#1a1714' }}>{c.name}</span>
                         <span style={{ fontSize: '.65rem', color: '#a09a92', fontFamily: "'DM Mono', monospace" }}>{timeAgo(c.timestamp)}</span>
                       </div>
-                      <div style={{ fontSize: '.82rem', color: '#4a4540' }}>{c.text}</div>
+                      <div style={{ fontSize: '.82rem', color: '#4a4540', lineHeight: 1.5 }}>{renderCommentText(c.text)}</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', position: 'relative' }}>
               <Avatar name={currentUser.name} role={currentUser.role} />
-              <div style={{ flex: 1, display: 'flex', gap: '.4rem' }}>
+              <div style={{ flex: 1, display: 'flex', gap: '.4rem', position: 'relative' }}>
+                {mentionQuery !== null && (
+                  <MentionDropdown query={mentionQuery} onSelect={insertMention} />
+                )}
                 <input
+                  ref={inputRef}
                   className="bl-input"
                   style={{ flex: 1, fontSize: '.82rem', padding: '.45rem .8rem' }}
-                  placeholder={`Add a comment as ${currentUser.name}...`}
+                  placeholder={`Comment as ${currentUser.name}… type @ to mention`}
                   value={commentText}
-                  onChange={e => setCommentText(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleComment()}
+                  onChange={handleCommentChange}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && mentionQuery === null) handleComment();
+                    if (e.key === 'Escape') setMentionQuery(null);
+                  }}
                 />
                 <button
                   className="bl-btn-primary"
@@ -201,6 +283,9 @@ function FeedCard({ item, currentUser, onAddComment, onRemove }: {
                 >Post</button>
               </div>
             </div>
+            <div style={{ marginTop: 4, paddingLeft: 44, fontFamily: "'DM Mono', monospace", fontSize: '.62rem', color: '#a09a92' }}>
+              type @ to mention a teammate
+            </div>
           </>
         )}
       </div>
@@ -209,31 +294,77 @@ function FeedCard({ item, currentUser, onAddComment, onRemove }: {
 }
 
 export function TeamFeedPage({ teamFeed, user, onAddComment, onRemove }: Props) {
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
+  const [secondsAgo, setSecondsAgo] = useState(0);
+  const [filterBy, setFilterBy] = useState<'all' | 'mine' | 'mentioned'>('all');
+
+  useEffect(() => {
+    setLastRefresh(Date.now());
+    setSecondsAgo(0);
+  }, [teamFeed]);
+
+  useEffect(() => {
+    const t = setInterval(() => setSecondsAgo(Math.round((Date.now() - lastRefresh) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [lastRefresh]);
+
   const uniqueUsers = [...new Set(teamFeed.map(f => f.sharedBy.username))].length;
   const avgScore = teamFeed.length
     ? Math.round(teamFeed.reduce((s, f) => s + f.score, 0) / teamFeed.length)
     : 0;
 
+  const totalComments = teamFeed.reduce((s, f) => s + f.comments.length, 0);
+
+  const filtered = teamFeed.filter(item => {
+    if (filterBy === 'mine') return item.sharedBy.username === user.username;
+    if (filterBy === 'mentioned') return item.comments.some(c => c.text.includes(`@${user.username}`));
+    return true;
+  });
+
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', padding: '2rem 1.5rem' }}>
       {/* Header */}
-      <div style={{ marginBottom: '1.8rem' }}>
-        <h1 className="bl-serif" style={{ fontSize: '1.75rem', color: '#1a1714' }}>Team Feed</h1>
-        <p className="bl-mono" style={{ fontSize: '.84rem', color: '#7a756e', marginTop: '.3rem' }}>// Shared defect reports · team comments · collaborative review</p>
+      <div style={{ marginBottom: '1.4rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem' }}>
+        <div>
+          <h1 className="bl-serif" style={{ fontSize: '1.75rem', color: '#1a1714' }}>Team Feed</h1>
+          <p className="bl-mono" style={{ fontSize: '.84rem', color: '#7a756e', marginTop: '.3rem' }}>// Shared defect reports · team comments · collaborative review</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontFamily: "'DM Mono', monospace", fontSize: '.65rem', color: '#a09a92' }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#1d6b4e', animation: 'bl-pulse 2s infinite' }} />
+          live · syncs every 3s · {secondsAgo === 0 ? 'just now' : `${secondsAgo}s ago`}
+        </div>
       </div>
 
       {/* Stats bar */}
       {teamFeed.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '.75rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '.75rem', marginBottom: '1.2rem' }}>
           {[
             { label: 'Shared Reports', value: teamFeed.length, color: '#1e4b8a' },
             { label: 'Contributors', value: uniqueUsers, color: '#1d6b4e' },
+            { label: 'Comments', value: totalComments, color: '#b5830a' },
             { label: 'Avg Score', value: `${avgScore}/100`, color: avgScore >= 75 ? '#1d6b4e' : avgScore >= 55 ? '#b5830a' : '#c4410c' },
           ].map(s => (
-            <div key={s.label} className="bl-card" style={{ padding: '1rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: s.color, fontFamily: "'DM Mono', monospace" }}>{s.value}</div>
-              <div style={{ fontSize: '.72rem', color: '#7a756e', marginTop: '.2rem' }}>{s.label}</div>
+            <div key={s.label} className="bl-card" style={{ padding: '.85rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: s.color, fontFamily: "'DM Mono', monospace" }}>{s.value}</div>
+              <div style={{ fontSize: '.68rem', color: '#7a756e', marginTop: '.2rem' }}>{s.label}</div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filter tabs */}
+      {teamFeed.length > 0 && (
+        <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.2rem' }}>
+          {(['all', 'mine', 'mentioned'] as const).map(f => (
+            <button key={f} onClick={() => setFilterBy(f)} style={{
+              padding: '.35rem .85rem', borderRadius: 20, border: '1px solid',
+              fontSize: '.75rem', fontFamily: "'DM Mono', monospace", cursor: 'pointer', fontWeight: 600, transition: 'all .15s',
+              background: filterBy === f ? '#1e4b8a' : '#fffefb',
+              color: filterBy === f ? '#fff' : '#7a756e',
+              borderColor: filterBy === f ? '#1e4b8a' : '#d4cfc5',
+            }}>
+              {f === 'all' ? `All (${teamFeed.length})` : f === 'mine' ? 'My Reports' : `@Mentions`}
+            </button>
           ))}
         </div>
       )}
@@ -247,8 +378,12 @@ export function TeamFeedPage({ teamFeed, user, onAddComment, onRemove }: Props) 
             Analyze a bug report and click <strong>Share to Team</strong> to start the team feed.
           </div>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="bl-card" style={{ textAlign: 'center', padding: '2.5rem 2rem', color: '#7a756e' }}>
+          <div style={{ fontSize: '.9rem' }}>No reports match this filter.</div>
+        </div>
       ) : (
-        teamFeed.map(item => (
+        filtered.map(item => (
           <FeedCard
             key={item.id}
             item={item}
