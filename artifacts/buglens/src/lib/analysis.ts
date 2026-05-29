@@ -48,6 +48,15 @@ export function contentQuality(raw: string): ContentQuality {
   if (len >= 20 && unique <= 3) return 'junk';   // "ABCABCABCABCABC..."
   if (len >= 40 && unique <= 4) return 'junk';   // long strings with ≤4 distinct chars
 
+  // Keyboard-mashing / gibberish detection via vowel ratio.
+  // Real English text has ~35–40% vowels. Random consonant-heavy mashing sits < 15%.
+  // Only apply when there are enough letters to be statistically meaningful.
+  const letters = (chars.match(/[a-z]/g) || []).length;
+  if (letters >= 15) {
+    const vowels = (chars.match(/[aeiou]/g) || []).length;
+    if (vowels / letters < 0.12) return 'junk'; // < 12 % vowels → gibberish
+  }
+
   return 'ok';
 }
 

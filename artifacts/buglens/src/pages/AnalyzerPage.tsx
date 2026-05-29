@@ -225,7 +225,12 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
           <input className="bl-input" data-testid="input-title" value={fields.title} onChange={set('title')} placeholder="e.g. Login button unresponsive on Safari 17 with 2FA enabled" />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 2 }}>
             <InlineHint hint={getInlineHint('title', fields.title)} />
-            <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.title.length > 20 ? '#1d6b4e' : fields.title.length > 0 ? '#b5830a' : '#a09a92', flexShrink: 0, paddingLeft: 8 }}>{fields.title.length} chars</div>
+            {(() => {
+              const t = fields.title.trim();
+              const q = contentQuality(t);
+              const col = !t ? '#a09a92' : q === 'junk' ? '#c4410c' : t.length > 20 ? '#1d6b4e' : '#b5830a';
+              return <div className="bl-mono" style={{ fontSize: '.67rem', color: col, flexShrink: 0, paddingLeft: 8 }}>{t.length} chars{fields.title.length !== t.length ? ' (trimmed)' : ''}</div>;
+            })()}
           </div>
         </div>
         <div className="bl-field">
@@ -233,7 +238,12 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
           <textarea className="bl-textarea" data-testid="input-desc" rows={3} value={fields.desc} onChange={set('desc')} placeholder="What is broken? What is the user impact? Any frequency or pattern?" />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 2 }}>
             <InlineHint hint={getInlineHint('desc', fields.desc)} />
-            <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.desc.length > 20 ? '#1d6b4e' : fields.desc.length > 0 ? '#b5830a' : '#a09a92', flexShrink: 0, paddingLeft: 8 }}>{fields.desc.length} chars</div>
+            {(() => {
+              const t = fields.desc.trim();
+              const q = contentQuality(t);
+              const col = !t ? '#a09a92' : q === 'junk' ? '#c4410c' : t.length > 20 ? '#1d6b4e' : '#b5830a';
+              return <div className="bl-mono" style={{ fontSize: '.67rem', color: col, flexShrink: 0, paddingLeft: 8 }}>{t.length} chars{fields.desc.length !== t.length ? ' (trimmed)' : ''}</div>;
+            })()}
           </div>
         </div>
       </div>
@@ -247,7 +257,12 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
             placeholder={'1. Go to the login page\n2. Enter valid credentials\n3. Click Sign In\n4. Observe...'} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 2 }}>
             <InlineHint hint={getInlineHint('steps', fields.steps)} />
-            <div className="bl-mono" style={{ fontSize: '.67rem', color: fields.steps.length > 20 ? '#1d6b4e' : fields.steps.length > 0 ? '#b5830a' : '#a09a92', flexShrink: 0, paddingLeft: 8 }}>{fields.steps.length} chars</div>
+            {(() => {
+              const t = fields.steps.trim();
+              const q = contentQuality(t);
+              const col = !t ? '#a09a92' : q === 'junk' ? '#c4410c' : t.length > 20 ? '#1d6b4e' : '#b5830a';
+              return <div className="bl-mono" style={{ fontSize: '.67rem', color: col, flexShrink: 0, paddingLeft: 8 }}>{t.length} chars{fields.steps.length !== t.length ? ' (trimmed)' : ''}</div>;
+            })()}
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
