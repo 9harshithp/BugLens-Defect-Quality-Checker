@@ -21,50 +21,138 @@ export function timeAgo(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
+/* ── Content Quality Gate ────────────────────────────────────────────────
+   Returns:
+     'empty' → nothing meaningful was typed (blank / whitespace only) → score 0
+     'junk'  → repeated/single-char padding (e.g. "AAAA", spaces) → score 1
+     'ok'    → real content → normal length-based scoring
+   ──────────────────────────────────────────────────────────────────────── */
+export type ContentQuality = 'empty' | 'junk' | 'ok';
+
+export function contentQuality(raw: string): ContentQuality {
+  const t = raw.trim();
+  if (!t) return 'empty';
+
+  // Strip all whitespace to check actual character diversity
+  const chars = t.replace(/\s+/g, '').toLowerCase();
+  if (!chars) return 'empty'; // only whitespace
+
+  const unique = new Set(chars).size;
+  const len = t.length;
+
+  // Single repeated character: "AAAAAAA", "111111", "......"
+  if (unique === 1) return 'junk';
+
+  // Very low diversity relative to length
+  if (len >= 6  && unique <= 2) return 'junk';   // "ABABAB", "aabbbb"
+  if (len >= 20 && unique <= 3) return 'junk';   // "ABCABCABCABCABC..."
+  if (len >= 40 && unique <= 4) return 'junk';   // long strings with ≤4 distinct chars
+
+  return 'ok';
+}
+
+/* ── Scoring helpers (trim + quality-gated) ─────────────────────────── */
+
+function scoreTitle(raw: string): number {
+  const t = raw.trim();
+  const q = contentQuality(t);
+  if (q === 'empty') return 0;
+  if (q === 'junk')  return 1;
+  const len = t.length;
+  if (len <= 8)  return 4;
+  if (len <= 20) return 8;
+  if (len <= 35) return 13;
+  if (len <= 60) return 17;
+  return 20;
+}
+
+function scoreDesc(raw: string): number {
+  const t = raw.trim();
+  const q = contentQuality(t);
+  if (q === 'empty') return 0;
+  if (q === 'junk')  return 1;
+  const len = t.length;
+  if (len <= 20)  return 4;
+  if (len <= 80)  return 8;
+  if (len <= 150) return 13;
+  if (len <= 300) return 17;
+  return 20;
+}
+
+function scoreSteps(raw: string): number {
+  const t = raw.trim();
+  const q = contentQuality(t);
+  if (q === 'empty') return 0;
+  if (q === 'junk')  return 1;
+  const len = t.length;
+  const stepLines = (t.match(/\n/g) || []).length;
+  if (len <= 15)                        return 4;
+  if (len > 100 && stepLines >= 4)      return 20;
+  if (len > 60  && stepLines >= 2)      return 17;
+  if (len > 30  && t.includes('\n'))    return 13;
+  if (len > 30)                         return 8;
+  return 4;
+}
+
+function scoreExpAct(expRaw: string, actRaw: string): number {
+  const expT = expRaw.trim();
+  const actT = actRaw.trim();
+  const expQ = contentQuality(expT);
+  const actQ = contentQuality(actT);
+  const expLen = expQ === 'ok' ? expT.length : 0;
+  const actLen = actQ === 'ok' ? actT.length : 0;
+  const expJunk = expQ === 'junk';
+  const actJunk = actQ === 'junk';
+
+  if (expQ === 'empty' && actQ === 'empty') return 0;
+  if (expJunk && actJunk) return 1;
+  if ((expLen > 20 && actLen > 20) || (expLen > 20 && actJunk) || (actLen > 20 && expJunk)) {
+    // at least one side is detailed
+    if (expLen > 20 && actLen > 20) return 15;
+    return 7;
+  }
+  if (expLen > 0 && actLen > 0)   return 11;
+  if (expLen > 20 || actLen > 20) return 7;
+  if (expLen > 0 || actLen > 0 || expJunk || actJunk) return 4;
+  return 0;
+}
+
+function scoreEnv(raw: string): number {
+  const t = raw.trim();
+  const q = contentQuality(t);
+  if (q === 'empty') return 0;
+  if (q === 'junk')  return 1;
+  const len = t.length;
+  if (len <= 10) return 4;
+  if (len <= 25) return 8;
+  if (len <= 50) return 12;
+  return 15;
+}
+
+function scoreAtt(raw: string): number {
+  const t = raw.trim();
+  const q = contentQuality(t);
+  if (q === 'empty') return 0;
+  if (q === 'junk')  return 0;
+  const len = t.length;
+  if (len <= 10) return 1;
+  if (len <= 30) return 3;
+  return 5;
+}
+
+/* ── Live score (used for the progress bar while typing) ─────────────── */
 export function computeLiveScore(
   title: string, desc: string, steps: string,
   exp: string, act: string, env: string, sev: string
 ): number {
-  const tScore =
-    title.length === 0 ? 0 :
-    title.length <= 8 ? 4 :
-    title.length <= 20 ? 8 :
-    title.length <= 35 ? 13 :
-    title.length <= 60 ? 17 : 20;
-
-  const dScore =
-    desc.length === 0 ? 0 :
-    desc.length <= 20 ? 4 :
-    desc.length <= 80 ? 8 :
-    desc.length <= 150 ? 13 :
-    desc.length <= 300 ? 17 : 20;
-
-  const stepLines = (steps.match(/\n/g) || []).length;
-  const sScore =
-    steps.length === 0 ? 0 :
-    steps.length <= 15 ? 4 :
-    steps.length > 100 && stepLines >= 4 ? 20 :
-    steps.length > 60 && stepLines >= 2 ? 17 :
-    steps.length > 30 && steps.includes('\n') ? 13 :
-    steps.length > 30 ? 8 : 4;
-
-  const expLen = exp.trim().length;
-  const actLen = act.trim().length;
-  const eaScore =
-    (expLen > 20 && actLen > 20) ? 15 :
-    (expLen > 0 && actLen > 0) ? 11 :
-    (expLen > 20 || actLen > 20) ? 7 :
-    (expLen > 0 || actLen > 0) ? 4 : 0;
-
-  const envScore =
-    env.length === 0 ? 0 :
-    env.length <= 10 ? 4 :
-    env.length <= 25 ? 8 :
-    env.length <= 50 ? 12 : 15;
-
-  const sevScore = sev ? 5 : 0;
-
-  return tScore + dScore + sScore + eaScore + envScore + sevScore;
+  return (
+    scoreTitle(title) +
+    scoreDesc(desc) +
+    scoreSteps(steps) +
+    scoreExpAct(exp, act) +
+    scoreEnv(env) +
+    (sev ? 5 : 0)
+  );
 }
 
 export function parseException(txt: string): ExceptionMatch[] {
@@ -94,83 +182,97 @@ export function parseException(txt: string): ExceptionMatch[] {
   return results;
 }
 
+/* ── Rule-based analysis (no API key required) ── */
 export function ruleBasedAnalysis(fields: {
   title: string; desc: string; steps: string;
   exp: string; act: string; env: string;
   sev: string; pri: string; comp: string;
   rep: string; exc: string; att: string;
 }): AnalysisResult {
-  const { title, desc, steps, exp, act, env, sev, att } = fields;
+  const { title, desc, steps, exp, act, env, sev } = fields;
 
-  const tScore =
-    title.length === 0 ? 0 :
-    title.length <= 8 ? 4 :
-    title.length <= 20 ? 8 :
-    title.length <= 35 ? 13 :
-    title.length <= 60 ? 17 : 20;
-
-  const dScore =
-    desc.length === 0 ? 0 :
-    desc.length <= 20 ? 4 :
-    desc.length <= 80 ? 8 :
-    desc.length <= 150 ? 13 :
-    desc.length <= 300 ? 17 : 20;
-
-  const stepLines = (steps.match(/\n/g) || []).length;
-  const sScore =
-    steps.length === 0 ? 0 :
-    steps.length <= 15 ? 4 :
-    steps.length > 100 && stepLines >= 4 ? 20 :
-    steps.length > 60 && stepLines >= 2 ? 17 :
-    steps.length > 30 && steps.includes('\n') ? 13 :
-    steps.length > 30 ? 8 : 4;
-
-  const expLen = exp.trim().length;
-  const actLen = act.trim().length;
-  const eaScore =
-    (expLen > 20 && actLen > 20) ? 15 :
-    (expLen > 0 && actLen > 0) ? 11 :
-    (expLen > 20 || actLen > 20) ? 7 :
-    (expLen > 0 || actLen > 0) ? 4 : 0;
-
-  const envScore =
-    env.length === 0 ? 0 :
-    env.length <= 10 ? 4 :
-    env.length <= 25 ? 8 :
-    env.length <= 50 ? 12 : 15;
-
+  const tScore  = scoreTitle(title);
+  const dScore  = scoreDesc(desc);
+  const sScore  = scoreSteps(steps);
+  const eaScore = scoreExpAct(exp, act);
+  const envScore = scoreEnv(env);
   const sevScore = sev ? 5 : 0;
-
-  const attScore =
-    att.length === 0 ? 0 :
-    att.length <= 10 ? 1 :
-    att.length <= 30 ? 3 : 5;
+  const attScore = scoreAtt(fields.att);
 
   const overall = tScore + dScore + sScore + eaScore + envScore + sevScore + attScore;
 
   const alerts: AnalysisResult['missing_alerts'] = [];
   const suggestions: string[] = [];
 
-  if (!title)         alerts.push({ field: 'Bug Title',    severity: 'critical', message: 'A descriptive title is required. Include the component, action, and observed behavior.' });
-  else if (title.length < 15) alerts.push({ field: 'Bug Title', severity: 'warning', message: 'Title is too short. Add component name, environment, or specific failure detail.' });
+  // ── Junk / whitespace detection alerts ──────────────────────────────
+  const junkFields: Array<{ key: string; label: string; val: string }> = [
+    { key: 'title', label: 'Bug Title', val: title },
+    { key: 'desc',  label: 'Description', val: desc },
+    { key: 'steps', label: 'Steps to Reproduce', val: steps },
+    { key: 'exp',   label: 'Expected Result', val: exp },
+    { key: 'act',   label: 'Actual Result',   val: act },
+    { key: 'env',   label: 'Environment',     val: env },
+  ];
+  for (const f of junkFields) {
+    const q = contentQuality(f.val);
+    if (q === 'junk') {
+      alerts.push({
+        field: f.label,
+        severity: 'critical',
+        message: `"${f.label}" contains repeated or nonsense characters. Please provide meaningful information — this field scored 1/${f.key === 'env' ? 15 : f.key === 'exp' || f.key === 'act' ? 15 : 20}.`,
+      });
+    }
+  }
 
-  if (!desc)          alerts.push({ field: 'Description',  severity: 'critical', message: 'Description is missing. Explain what is broken and its user impact.' });
-  else if (desc.length < 50) alerts.push({ field: 'Description', severity: 'warning', message: 'Description is brief. Add frequency, impact scope, and failure pattern.' });
+  // ── Standard missing / weak field alerts ────────────────────────────
+  const titleT = title.trim();
+  const descT  = desc.trim();
+  const stepsT = steps.trim();
+  const expT   = exp.trim();
+  const actT   = act.trim();
+  const envT   = env.trim();
 
-  if (!steps)         alerts.push({ field: 'Steps to Reproduce', severity: 'critical', message: 'Reproduction steps are required. Number each step clearly.' });
-  else if (!steps.includes('\n')) alerts.push({ field: 'Steps to Reproduce', severity: 'warning', message: 'Steps appear unnumbered. Format as 1. Step one\n2. Step two for clarity.' });
+  if (!titleT) {
+    alerts.push({ field: 'Bug Title',    severity: 'critical', message: 'A descriptive title is required. Include the component, action, and observed behavior.' });
+  } else if (contentQuality(titleT) === 'ok' && titleT.length < 15) {
+    alerts.push({ field: 'Bug Title', severity: 'warning', message: 'Title is too short. Add component name, environment, or specific failure detail.' });
+  }
 
-  if (!exp && !act)   alerts.push({ field: 'Expected / Actual Result', severity: 'critical', message: 'Both expected and actual results are needed to validate the fix.' });
-  else if (!exp)      alerts.push({ field: 'Expected Result', severity: 'warning', message: 'Missing expected behavior — add what should happen after the steps.' });
-  else if (!act)      alerts.push({ field: 'Actual Result',   severity: 'warning', message: 'Missing actual behavior — describe what actually happened.' });
+  if (!descT) {
+    alerts.push({ field: 'Description',  severity: 'critical', message: 'Description is missing. Explain what is broken and its user impact.' });
+  } else if (contentQuality(descT) === 'ok' && descT.length < 50) {
+    alerts.push({ field: 'Description', severity: 'warning', message: 'Description is brief. Add frequency, impact scope, and failure pattern.' });
+  }
 
-  if (!env)           alerts.push({ field: 'Environment',   severity: 'warning', message: 'No environment info. Add OS, browser, app version, and server/env name.' });
-  if (!sev)           alerts.push({ field: 'Severity',      severity: 'info',    message: 'Severity not set. Helps triage and prioritization.' });
-  if (!att)           alerts.push({ field: 'Attachments',   severity: 'info',    message: 'No attachments. Screenshots, logs, or screen recordings speed up diagnosis.' });
+  if (!stepsT) {
+    alerts.push({ field: 'Steps to Reproduce', severity: 'critical', message: 'Reproduction steps are required. Number each step clearly.' });
+  } else if (contentQuality(stepsT) === 'ok' && !stepsT.includes('\n')) {
+    alerts.push({ field: 'Steps to Reproduce', severity: 'warning', message: 'Steps appear unnumbered. Format as 1. Step one\n2. Step two for clarity.' });
+  }
 
-  if (title.length > 0) suggestions.push(`Consider refining the title to follow the pattern: "[Component] [Action] [Failure]" — e.g. "${title.split(' ').slice(0,3).join(' ')} on [Platform/Version]".`);
-  if (desc.length > 0 && desc.length < 200) suggestions.push('Expand the description to include: frequency (does this happen every time?), affected user segment, and whether it regressed recently.');
-  if (steps.length > 0) suggestions.push('Add a prerequisite state before step 1 (e.g. "User must be logged in as Admin") to make reproduction deterministic.');
+  const expOk = contentQuality(expT) === 'ok';
+  const actOk = contentQuality(actT) === 'ok';
+  if (!expT && !actT) {
+    alerts.push({ field: 'Expected / Actual Result', severity: 'critical', message: 'Both expected and actual results are needed to validate the fix.' });
+  } else if (!expOk && expT) {
+    // already caught by junk loop
+  } else if (!expT) {
+    alerts.push({ field: 'Expected Result', severity: 'warning', message: 'Missing expected behavior — add what should happen after the steps.' });
+  } else if (!actT) {
+    alerts.push({ field: 'Actual Result',   severity: 'warning', message: 'Missing actual behavior — describe what actually happened.' });
+  }
+
+  if (!envT)           alerts.push({ field: 'Environment',   severity: 'warning', message: 'No environment info. Add OS, browser, app version, and server/env name.' });
+  if (!sev)            alerts.push({ field: 'Severity',      severity: 'info',    message: 'Severity not set. Helps triage and prioritization.' });
+  if (!fields.att.trim()) alerts.push({ field: 'Attachments', severity: 'info',   message: 'No attachments. Screenshots, logs, or screen recordings speed up diagnosis.' });
+
+  // ── Suggestions ─────────────────────────────────────────────────────
+  if (contentQuality(titleT) === 'ok' && titleT.length > 0)
+    suggestions.push(`Consider refining the title to follow the pattern: "[Component] [Action] [Failure]" — e.g. "${titleT.split(' ').slice(0,3).join(' ')} on [Platform/Version]".`);
+  if (contentQuality(descT) === 'ok' && descT.length > 0 && descT.length < 200)
+    suggestions.push('Expand the description to include: frequency (does this happen every time?), affected user segment, and whether it regressed recently.');
+  if (contentQuality(stepsT) === 'ok' && stepsT.length > 0)
+    suggestions.push('Add a prerequisite state before step 1 (e.g. "User must be logged in as Admin") to make reproduction deterministic.');
   suggestions.push('Include a test case hint: GIVEN [precondition] WHEN [action] THEN [expected outcome] — this directly maps to an automated test.');
   suggestions.push('Reference any related tickets or PRs that may have introduced this regression to help developers narrow scope quickly.');
 
@@ -182,7 +284,7 @@ export function ruleBasedAnalysis(fields: {
 
   const effort: AnalysisResult['estimated_fix_effort'] =
     fields.exc.includes('OutOfMemory') || fields.exc.includes('StackOverflow') ? 'Days' :
-    sev === 'Critical' ? 'Hours' : sev === 'High' ? 'Days' : 'Days';
+    sev === 'Critical' ? 'Hours' : 'Days';
 
   const assignee = guessAssignee(fields);
 
@@ -190,8 +292,8 @@ export function ruleBasedAnalysis(fields: {
     ? `The error trace indicates a ${parseException(fields.exc)[0]?.type ?? 'runtime exception'} originating at the described step. The root cause likely involves missing null/undefined guards or invalid state transitions. Recommend reviewing the relevant module with added defensive checks and unit tests covering the edge case.`
     : 'No exception provided.';
 
-  const testHint = (exp && act)
-    ? `GIVEN a user is on the affected screen AND the preconditions are met, WHEN the described action is performed, THEN ${exp || 'the expected behavior should occur'}`
+  const testHint = (expOk && actOk)
+    ? `GIVEN a user is on the affected screen AND the preconditions are met, WHEN the described action is performed, THEN ${expT || 'the expected behavior should occur'}`
     : `GIVEN [preconditions], WHEN [trigger action from steps], THEN [expected result]`;
 
   return {
@@ -267,6 +369,7 @@ function buildRewrite(fields: {
   return lines.join('\n');
 }
 
+/* ── AI-powered analysis via Anthropic API ── */
 export async function aiAnalysis(
   fields: {
     title: string; desc: string; steps: string;

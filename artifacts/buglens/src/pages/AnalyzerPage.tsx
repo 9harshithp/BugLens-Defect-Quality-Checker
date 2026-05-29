@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ResultsPanel } from './ResultsPanel';
-import { computeLiveScore, ruleBasedAnalysis, aiAnalysis, scoreColor, gradeMeta } from '../lib/analysis';
+import { computeLiveScore, ruleBasedAnalysis, aiAnalysis, scoreColor, gradeMeta, contentQuality } from '../lib/analysis';
 import { getRandomSample } from '../lib/samples';
 import { useToastTrigger } from '../components/Toast';
 import type { AnalysisResult, HistoryItem, User } from '../lib/types';
@@ -14,8 +14,11 @@ interface Props {
 
 function getInlineHint(field: string, value: string, value2?: string): { score: number; max: number; tip: string; color: string } | null {
   if (field === 'title') {
-    const len = value.length;
-    if (len === 0) return null;
+    const t = value.trim();
+    if (!t) return null;
+    const q = contentQuality(t);
+    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/20' };
+    const len = t.length;
     if (len <= 8)  return { score: 4,  max: 20, color: '#c4410c', tip: 'Try: "[Component] [Action] [Failure]" — e.g. "Login button fails on Safari 17"' };
     if (len <= 20) return { score: 8,  max: 20, color: '#b5830a', tip: 'Add the component name and specific behavior observed' };
     if (len <= 35) return { score: 13, max: 20, color: '#b5830a', tip: 'Getting better! Include browser/version for more points' };
@@ -23,8 +26,11 @@ function getInlineHint(field: string, value: string, value2?: string): { score: 
     return { score: 20, max: 20, color: '#1d6b4e', tip: '✓ Excellent title' };
   }
   if (field === 'desc') {
-    const len = value.length;
-    if (len === 0) return null;
+    const t = value.trim();
+    if (!t) return null;
+    const q = contentQuality(t);
+    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/20' };
+    const len = t.length;
     if (len <= 20)  return { score: 4,  max: 20, color: '#c4410c', tip: 'Explain what is broken and its impact on users' };
     if (len <= 80)  return { score: 8,  max: 20, color: '#b5830a', tip: 'Add frequency (every time?), affected users, and failure pattern' };
     if (len <= 150) return { score: 13, max: 20, color: '#b5830a', tip: 'Good! Mention if this is a regression and when it started' };
@@ -32,27 +38,40 @@ function getInlineHint(field: string, value: string, value2?: string): { score: 
     return { score: 20, max: 20, color: '#1d6b4e', tip: '✓ Thorough description' };
   }
   if (field === 'steps') {
-    const len = value.length;
-    const lines = (value.match(/\n/g) || []).length;
-    if (len === 0) return null;
+    const t = value.trim();
+    if (!t) return null;
+    const q = contentQuality(t);
+    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/20' };
+    const len = t.length;
+    const lines = (t.match(/\n/g) || []).length;
     if (len <= 15) return { score: 4, max: 20, color: '#c4410c', tip: 'Number each step: "1. Go to login 2. Enter credentials 3. Click..."' };
     if (len > 100 && lines >= 4) return { score: 20, max: 20, color: '#1d6b4e', tip: '✓ Detailed numbered steps' };
-    if (len > 60 && lines >= 2)  return { score: 17, max: 20, color: '#1d6b4e', tip: 'Good! Add 4+ numbered steps with preconditions for full marks' };
-    if (len > 30 && lines >= 1)  return { score: 13, max: 20, color: '#b5830a', tip: 'Add more numbered steps — aim for 4+ clear lines' };
+    if (len > 60  && lines >= 2) return { score: 17, max: 20, color: '#1d6b4e', tip: 'Good! Add 4+ numbered steps with preconditions for full marks' };
+    if (len > 30  && lines >= 1) return { score: 13, max: 20, color: '#b5830a', tip: 'Add more numbered steps — aim for 4+ clear lines' };
     return { score: 8, max: 20, color: '#b5830a', tip: 'Break steps onto separate lines with numbers (1. 2. 3.)' };
   }
   if (field === 'env') {
-    const len = value.length;
-    if (len === 0) return null;
+    const t = value.trim();
+    if (!t) return null;
+    const q = contentQuality(t);
+    if (q === 'junk') return { score: 1, max: 15, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/15' };
+    const len = t.length;
     if (len <= 10) return { score: 4,  max: 15, color: '#c4410c', tip: 'Add OS, browser name/version, and app version' };
     if (len <= 25) return { score: 8,  max: 15, color: '#b5830a', tip: 'Include environment (staging/prod) and app version' };
     if (len <= 50) return { score: 12, max: 15, color: '#1d6b4e', tip: 'Add build number for full marks' };
     return { score: 15, max: 15, color: '#1d6b4e', tip: '✓ Complete environment details' };
   }
   if (field === 'exp_act') {
-    const expLen = value.trim().length;
-    const actLen = (value2 ?? '').trim().length;
-    if (expLen === 0 && actLen === 0) return null;
+    const expT = value.trim();
+    const actT = (value2 ?? '').trim();
+    if (!expT && !actT) return null;
+    const expQ = contentQuality(expT);
+    const actQ = contentQuality(actT);
+    const expJunk = expT && expQ === 'junk';
+    const actJunk = actT && actQ === 'junk';
+    if (expJunk || actJunk) return { score: 1, max: 15, color: '#c4410c', tip: '⚠ One or both fields contain repeated/nonsense text — scores 1/15' };
+    const expLen = expT.length;
+    const actLen = actT.length;
     if (expLen > 20 && actLen > 20) return { score: 15, max: 15, color: '#1d6b4e', tip: '✓ Both results clearly described' };
     if (expLen > 0 && actLen > 0)   return { score: 11, max: 15, color: '#b5830a', tip: 'Expand both fields with more detail for full marks' };
     if (expLen > 20 || actLen > 20) return { score: 7,  max: 15, color: '#b5830a', tip: 'Fill in the missing result field (expected or actual)' };
@@ -104,21 +123,29 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
 
   const liveTags = () => {
     const tags: Array<{ cls: string; label: string }> = [];
-    if (!fields.title) tags.push({ cls: 'bl-tag-red', label: 'No title' });
-    else if (fields.title.length < 15) tags.push({ cls: 'bl-tag-amber', label: 'Short title' });
+    const titleT = fields.title.trim();
+    const descT  = fields.desc.trim();
+    const stepsT = fields.steps.trim();
+
+    if (!titleT) tags.push({ cls: 'bl-tag-red', label: 'No title' });
+    else if (contentQuality(titleT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk title ⚠' });
+    else if (titleT.length < 15) tags.push({ cls: 'bl-tag-amber', label: 'Short title' });
     else tags.push({ cls: 'bl-tag-green', label: 'Title ✓' });
 
-    if (!fields.desc) tags.push({ cls: 'bl-tag-red', label: 'No description' });
+    if (!descT) tags.push({ cls: 'bl-tag-red', label: 'No description' });
+    else if (contentQuality(descT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk desc ⚠' });
     else tags.push({ cls: 'bl-tag-green', label: 'Description ✓' });
 
-    if (!fields.steps) tags.push({ cls: 'bl-tag-red', label: 'No steps' });
-    else if (!fields.steps.includes('\n')) tags.push({ cls: 'bl-tag-amber', label: 'Unnumbered steps' });
+    if (!stepsT) tags.push({ cls: 'bl-tag-red', label: 'No steps' });
+    else if (contentQuality(stepsT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk steps ⚠' });
+    else if (!stepsT.includes('\n')) tags.push({ cls: 'bl-tag-amber', label: 'Unnumbered steps' });
     else tags.push({ cls: 'bl-tag-green', label: 'Steps ✓' });
 
     if (!fields.sev) tags.push({ cls: 'bl-tag-amber', label: 'No severity' });
     else tags.push({ cls: 'bl-tag-green', label: 'Severity ✓' });
 
-    if (!fields.env) tags.push({ cls: 'bl-tag-amber', label: 'No environment' });
+    if (!fields.env.trim()) tags.push({ cls: 'bl-tag-amber', label: 'No environment' });
+    else if (contentQuality(fields.env.trim()) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk env ⚠' });
     else tags.push({ cls: 'bl-tag-green', label: 'Env ✓' });
     return tags;
   };
