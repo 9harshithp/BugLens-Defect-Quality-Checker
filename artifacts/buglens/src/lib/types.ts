@@ -75,7 +75,7 @@ export interface TeamFeedItem {
   comments: TeamComment[];
 }
 
-export type AppView = 'checker' | 'compare' | 'history' | 'dashboard' | 'team';
+export type AppView = 'checker' | 'compare' | 'history' | 'dashboard' | 'team' | 'jira';
 
 export interface GradeMeta {
   label: string;

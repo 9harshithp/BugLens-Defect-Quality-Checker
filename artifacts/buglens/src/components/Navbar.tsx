@@ -14,6 +14,7 @@ const TABS: { id: AppView; label: string; icon: string }[] = [
   { id: 'history',   label: 'History',   icon: '📋' },
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'team',      label: 'Team Feed', icon: '👥' },
+  { id: 'jira',      label: 'Jira',      icon: '🔗' },
 ];
 
 export function Navbar({ user, activeView, onViewChange, onLogout, teamCount = 0 }: Props) {

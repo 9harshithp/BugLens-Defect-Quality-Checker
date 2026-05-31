@@ -13,9 +13,10 @@ interface Props {
   onDownloadHTML: () => void;
   onDownloadJSON: () => void;
   onShareToTeam?: () => void;
+  onCreateJira?: () => void;
 }
 
-export function ResultsPanel({ result, title, excRaw, onDownloadTXT, onDownloadMD, onDownloadHTML, onDownloadJSON, onShareToTeam }: Props) {
+export function ResultsPanel({ result, title, excRaw, onDownloadTXT, onDownloadMD, onDownloadHTML, onDownloadJSON, onShareToTeam, onCreateJira }: Props) {
   const toast = useToastTrigger();
   const { overall_score, section_scores, missing_alerts, suggestions, exception_analysis, risk_level, estimated_fix_effort, recommended_assignee, test_case_hint, rewritten_report } = result;
   const col = scoreColor(overall_score);
@@ -63,6 +64,15 @@ export function ResultsPanel({ result, title, excRaw, onDownloadTXT, onDownloadM
                 onMouseEnter={e => (e.currentTarget.style.background = '#163870')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#1e4b8a')}
               >👥 Share to Team</button>
+            )}
+            {onCreateJira && (
+              <button
+                onClick={onCreateJira}
+                data-testid="button-create-jira"
+                style={{ fontSize: '.78rem', padding: '.45rem .9rem', background: '#1868DB', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: "'Outfit', sans-serif", fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '.35rem', transition: 'background .15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#1050a0')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#1868DB')}
+              ><span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '.9rem' }}>J</span> Create in Jira</button>
             )}
           </div>
         </div>

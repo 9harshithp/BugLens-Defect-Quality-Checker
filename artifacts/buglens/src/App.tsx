@@ -6,6 +6,7 @@ import { ComparePage } from './pages/ComparePage';
 import { HistoryPage } from './pages/HistoryPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamFeedPage } from './pages/TeamFeedPage';
+import { JiraPage } from './pages/JiraPage';
 import { ToastProvider, useToastTrigger } from './components/Toast';
 import { useAppStore } from './lib/store';
 import type { AppView } from './lib/types';
@@ -93,6 +94,7 @@ function AppContent() {
               onRemove={feedId => { removeFromTeamFeed(feedId); toast('Removed from team feed'); }}
             />
           )}
+          {view === 'jira' && <JiraPage />}
         </main>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ResultsPanel } from './ResultsPanel';
+import { JiraCreateModal } from '../components/JiraCreateModal';
 import { computeLiveScore, ruleBasedAnalysis, aiAnalysis, scoreColor, gradeMeta, contentQuality } from '../lib/analysis';
 import { getRandomSample } from '../lib/samples';
 import { useToastTrigger } from '../components/Toast';
@@ -111,6 +112,7 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
   const [error, setError] = useState('');
   const [liveScore, setLiveScore] = useState(0);
   const [showLiveBar, setShowLiveBar] = useState(false);
+  const [showJiraModal, setShowJiraModal] = useState(false);
 
   const set = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setFields(f => ({ ...f, [k]: e.target.value }));
@@ -391,6 +393,7 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
             result={result}
             title={fields.title}
             excRaw={fields.exc}
+            onCreateJira={() => setShowJiraModal(true)}
             onShareToTeam={currentHistItem && onShareToTeam
               ? () => { onShareToTeam(currentHistItem); }
               : undefined
@@ -420,6 +423,15 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
             }}
           />
         </div>
+      )}
+
+      {/* Jira create modal */}
+      {showJiraModal && result && (
+        <JiraCreateModal
+          result={result}
+          title={fields.title}
+          onClose={() => setShowJiraModal(false)}
+        />
       )}
     </div>
   );
