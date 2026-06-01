@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg-base: #1a1714;
+  --color-text-base: #fffefb;
+  --color-accent: #c4410c;
+  --color-highlight: #4ade80;
+
+  --font-display: 'Playfair Display', serif;
+  --font-body: 'JetBrains Mono', monospace;
+}
+
+@theme inline {
+  --color-bg-base: var(--color-bg-base);
+  --color-text-base: var(--color-text-base);
+  --color-accent: var(--color-accent);
+  --color-highlight: var(--color-highlight);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

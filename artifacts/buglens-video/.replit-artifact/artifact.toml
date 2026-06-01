@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/buglens-video/"
+title = "BugLens — Product Demo Video"
+version = "1.0.0"
+id = "artifacts/buglens-video"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/buglens-video/" ]
+localPort = 19390
+
+[services.development]
+run = "pnpm --filter @workspace/buglens-video run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/buglens-video", "run", "build" ]
+publicDir = "artifacts/buglens-video/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19390"
+BASE_PATH = "/buglens-video/"
