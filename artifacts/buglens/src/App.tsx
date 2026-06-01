@@ -5,7 +5,7 @@ import { AnalyzerPage } from './pages/AnalyzerPage';
 import { ComparePage } from './pages/ComparePage';
 import { HistoryPage } from './pages/HistoryPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { TeamFeedPage } from './pages/TeamFeedPage';
+
 import { JiraPage } from './pages/JiraPage';
 import { ToastProvider, useToastTrigger } from './components/Toast';
 import { useAppStore } from './lib/store';
@@ -13,10 +13,9 @@ import type { AppView } from './lib/types';
 
 function AppContent() {
   const {
-    user, history, teamFeed,
+    user, history,
     login, signup, logout,
     addToHistory, deleteFromHistory, clearHistory,
-    shareToTeam, addComment, removeFromTeamFeed,
   } = useAppStore();
   const [view, setView] = useState<AppView>('checker');
   const toast = useToastTrigger();
@@ -56,7 +55,6 @@ function AppContent() {
           activeView={view}
           onViewChange={setView}
           onLogout={handleLogout}
-          teamCount={teamFeed.length}
         />
 
         <main style={{ flex: 1 }}>
@@ -64,12 +62,6 @@ function AppContent() {
             <AnalyzerPage
               user={user}
               onAddHistory={item => addToHistory(item, user.username)}
-              onShareToTeam={item => {
-                const ok = shareToTeam(item, user);
-                if (ok) { toast('👥 Shared to Team Feed!'); setView('team'); }
-                else toast('Already shared to team feed');
-                return ok;
-              }}
             />
           )}
           {view === 'compare' && (
@@ -85,14 +77,6 @@ function AppContent() {
           )}
           {view === 'dashboard' && (
             <DashboardPage history={history} user={user} />
-          )}
-          {view === 'team' && (
-            <TeamFeedPage
-              teamFeed={teamFeed}
-              user={user}
-              onAddComment={(feedId, text, u) => addComment(feedId, text, u)}
-              onRemove={feedId => { removeFromTeamFeed(feedId); toast('Removed from team feed'); }}
-            />
           )}
           {view === 'jira' && <JiraPage />}
         </main>

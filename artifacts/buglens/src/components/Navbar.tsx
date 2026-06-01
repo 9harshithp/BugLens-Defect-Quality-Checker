@@ -13,7 +13,6 @@ const TABS: { id: AppView; label: string; icon: string }[] = [
   { id: 'compare',   label: 'Compare',   icon: '⚖️' },
   { id: 'history',   label: 'History',   icon: '📋' },
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { id: 'team',      label: 'Team Feed', icon: '👥' },
   { id: 'jira',      label: 'Jira',      icon: '🔗' },
 ];
 
@@ -50,8 +49,7 @@ export function Navbar({ user, activeView, onViewChange, onLogout, teamCount = 0
         {/* Tabs */}
         {TABS.map(tab => {
           const isActive = activeView === tab.id;
-          const isTeam = tab.id === 'team';
-          return (
+                  return (
             <button
               key={tab.id}
               onClick={() => onViewChange(tab.id)}
@@ -72,17 +70,6 @@ export function Navbar({ user, activeView, onViewChange, onLogout, teamCount = 0
             >
               <span style={{ fontSize: '.75rem' }}>{tab.icon}</span>
               {tab.label}
-              {isTeam && teamCount > 0 && (
-                <span style={{
-                  background: '#c4410c', color: '#fff',
-                  fontSize: '.6rem', fontWeight: 700,
-                  padding: '.05rem .35rem', borderRadius: 10,
-                  fontFamily: "'DM Mono', monospace",
-                  marginLeft: 2,
-                }}>
-                  {teamCount > 99 ? '99+' : teamCount}
-                </span>
-              )}
             </button>
           );
         })}
