@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ResultsPanel } from './ResultsPanel';
-import { JiraCreateModal } from '../components/JiraCreateModal';
-import { computeLiveScore, ruleBasedAnalysis, aiAnalysis, scoreColor, gradeMeta, contentQuality } from '../lib/analysis';
+import { ResultsModal } from './ResultsModal';
+import { computeLiveScore, ruleBasedAnalysis, aiAnalysis, scoreColor, gradeMeta, contentQuality, findDuplicates } from '../lib/analysis';
 import { getRandomSample } from '../lib/samples';
 import { useToastTrigger } from '../components/Toast';
-import type { AnalysisResult, HistoryItem, User } from '../lib/types';
+import { FileText, X, ClipboardList, Repeat, Settings2 } from 'lucide-react';
+import type { AnalysisResult, DefectCategory, HistoryItem, User } from '../lib/types';
 
 interface Props {
   user: User;
+  history: HistoryItem[];
+  useAi?: boolean;
   onAddHistory: (item: HistoryItem) => void;
-  onShareToTeam?: (item: HistoryItem) => boolean;
-  apiKey?: string;
+  onUpdateHistory?: (item: HistoryItem) => void;
 }
 
 function getInlineHint(field: string, value: string, value2?: string): { score: number; max: number; tip: string; color: string } | null {
@@ -18,35 +20,35 @@ function getInlineHint(field: string, value: string, value2?: string): { score: 
     const t = value.trim();
     if (!t) return null;
     const q = contentQuality(t);
-    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/20' };
+    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: 'Repeated/nonsense characters detected — this scores 1/20' };
     const len = t.length;
     if (len <= 8)  return { score: 4,  max: 20, color: '#c4410c', tip: 'Try: "[Component] [Action] [Failure]" — e.g. "Login button fails on Safari 17"' };
     if (len <= 20) return { score: 8,  max: 20, color: '#b5830a', tip: 'Add the component name and specific behavior observed' };
     if (len <= 35) return { score: 13, max: 20, color: '#b5830a', tip: 'Getting better! Include browser/version for more points' };
     if (len <= 60) return { score: 17, max: 20, color: '#1d6b4e', tip: 'Almost there — add platform or version detail for full marks' };
-    return { score: 20, max: 20, color: '#1d6b4e', tip: '✓ Excellent title' };
+    return { score: 20, max: 20, color: '#1d6b4e', tip: 'Excellent title' };
   }
   if (field === 'desc') {
     const t = value.trim();
     if (!t) return null;
     const q = contentQuality(t);
-    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/20' };
+    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: 'Repeated/nonsense characters detected — this scores 1/20' };
     const len = t.length;
     if (len <= 20)  return { score: 4,  max: 20, color: '#c4410c', tip: 'Explain what is broken and its impact on users' };
     if (len <= 80)  return { score: 8,  max: 20, color: '#b5830a', tip: 'Add frequency (every time?), affected users, and failure pattern' };
     if (len <= 150) return { score: 13, max: 20, color: '#b5830a', tip: 'Good! Mention if this is a regression and when it started' };
     if (len <= 300) return { score: 17, max: 20, color: '#1d6b4e', tip: 'Very detailed — expand with affected scope for full marks' };
-    return { score: 20, max: 20, color: '#1d6b4e', tip: '✓ Thorough description' };
+    return { score: 20, max: 20, color: '#1d6b4e', tip: 'Thorough description' };
   }
   if (field === 'steps') {
     const t = value.trim();
     if (!t) return null;
     const q = contentQuality(t);
-    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/20' };
+    if (q === 'junk') return { score: 1, max: 20, color: '#c4410c', tip: 'Repeated/nonsense characters detected — this scores 1/20' };
     const len = t.length;
     const lines = (t.match(/\n/g) || []).length;
     if (len <= 15) return { score: 4, max: 20, color: '#c4410c', tip: 'Number each step: "1. Go to login 2. Enter credentials 3. Click..."' };
-    if (len > 100 && lines >= 4) return { score: 20, max: 20, color: '#1d6b4e', tip: '✓ Detailed numbered steps' };
+    if (len > 100 && lines >= 4) return { score: 20, max: 20, color: '#1d6b4e', tip: 'Detailed numbered steps' };
     if (len > 60  && lines >= 2) return { score: 17, max: 20, color: '#1d6b4e', tip: 'Good! Add 4+ numbered steps with preconditions for full marks' };
     if (len > 30  && lines >= 1) return { score: 13, max: 20, color: '#b5830a', tip: 'Add more numbered steps — aim for 4+ clear lines' };
     return { score: 8, max: 20, color: '#b5830a', tip: 'Break steps onto separate lines with numbers (1. 2. 3.)' };
@@ -55,12 +57,12 @@ function getInlineHint(field: string, value: string, value2?: string): { score: 
     const t = value.trim();
     if (!t) return null;
     const q = contentQuality(t);
-    if (q === 'junk') return { score: 1, max: 15, color: '#c4410c', tip: '⚠ Repeated/nonsense characters detected — this scores 1/15' };
+    if (q === 'junk') return { score: 1, max: 15, color: '#c4410c', tip: 'Repeated/nonsense characters detected — this scores 1/15' };
     const len = t.length;
     if (len <= 10) return { score: 4,  max: 15, color: '#c4410c', tip: 'Add OS, browser name/version, and app version' };
     if (len <= 25) return { score: 8,  max: 15, color: '#b5830a', tip: 'Include environment (staging/prod) and app version' };
     if (len <= 50) return { score: 12, max: 15, color: '#1d6b4e', tip: 'Add build number for full marks' };
-    return { score: 15, max: 15, color: '#1d6b4e', tip: '✓ Complete environment details' };
+    return { score: 15, max: 15, color: '#1d6b4e', tip: 'Complete environment details' };
   }
   if (field === 'exp_act') {
     const expT = value.trim();
@@ -70,10 +72,10 @@ function getInlineHint(field: string, value: string, value2?: string): { score: 
     const actQ = contentQuality(actT);
     const expJunk = expT && expQ === 'junk';
     const actJunk = actT && actQ === 'junk';
-    if (expJunk || actJunk) return { score: 1, max: 15, color: '#c4410c', tip: '⚠ One or both fields contain repeated/nonsense text — scores 1/15' };
+    if (expJunk || actJunk) return { score: 1, max: 15, color: '#c4410c', tip: 'One or both fields contain repeated/nonsense text — scores 1/15' };
     const expLen = expT.length;
     const actLen = actT.length;
-    if (expLen > 20 && actLen > 20) return { score: 15, max: 15, color: '#1d6b4e', tip: '✓ Both results clearly described' };
+    if (expLen > 20 && actLen > 20) return { score: 15, max: 15, color: '#1d6b4e', tip: 'Both results clearly described' };
     if (expLen > 0 && actLen > 0)   return { score: 11, max: 15, color: '#b5830a', tip: 'Expand both fields with more detail for full marks' };
     if (expLen > 20 || actLen > 20) return { score: 7,  max: 15, color: '#b5830a', tip: 'Fill in the missing result field (expected or actual)' };
     return { score: 4, max: 15, color: '#c4410c', tip: 'Both Expected and Actual results are needed' };
@@ -99,7 +101,7 @@ function InlineHint({ hint }: { hint: { score: number; max: number; tip: string;
   );
 }
 
-export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Props) {
+export function AnalyzerPage({ user, history, useAi = false, onAddHistory, onUpdateHistory }: Props) {
   const toast = useToastTrigger();
 
   const [fields, setFields] = useState({
@@ -109,10 +111,15 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [currentHistItem, setCurrentHistItem] = useState<HistoryItem | null>(null);
+  const [dupModalItem, setDupModalItem] = useState<HistoryItem | null>(null);
   const [error, setError] = useState('');
   const [liveScore, setLiveScore] = useState(0);
   const [showLiveBar, setShowLiveBar] = useState(false);
-  const [showJiraModal, setShowJiraModal] = useState(false);
+
+  const duplicates = useMemo(() => {
+    const others = currentHistItem ? history.filter(h => h.id !== currentHistItem.id) : history;
+    return findDuplicates(fields, others);
+  }, [fields, history, currentHistItem]);
 
   const set = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setFields(f => ({ ...f, [k]: e.target.value }));
@@ -130,25 +137,25 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
     const stepsT = fields.steps.trim();
 
     if (!titleT) tags.push({ cls: 'bl-tag-red', label: 'No title' });
-    else if (contentQuality(titleT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk title ⚠' });
+    else if (contentQuality(titleT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk title' });
     else if (titleT.length < 15) tags.push({ cls: 'bl-tag-amber', label: 'Short title' });
-    else tags.push({ cls: 'bl-tag-green', label: 'Title ✓' });
+    else tags.push({ cls: 'bl-tag-green', label: 'Title complete' });
 
     if (!descT) tags.push({ cls: 'bl-tag-red', label: 'No description' });
-    else if (contentQuality(descT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk desc ⚠' });
-    else tags.push({ cls: 'bl-tag-green', label: 'Description ✓' });
+    else if (contentQuality(descT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk description' });
+    else tags.push({ cls: 'bl-tag-green', label: 'Description complete' });
 
     if (!stepsT) tags.push({ cls: 'bl-tag-red', label: 'No steps' });
-    else if (contentQuality(stepsT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk steps ⚠' });
+    else if (contentQuality(stepsT) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk steps' });
     else if (!stepsT.includes('\n')) tags.push({ cls: 'bl-tag-amber', label: 'Unnumbered steps' });
-    else tags.push({ cls: 'bl-tag-green', label: 'Steps ✓' });
+    else tags.push({ cls: 'bl-tag-green', label: 'Steps complete' });
 
     if (!fields.sev) tags.push({ cls: 'bl-tag-amber', label: 'No severity' });
-    else tags.push({ cls: 'bl-tag-green', label: 'Severity ✓' });
+    else tags.push({ cls: 'bl-tag-green', label: 'Severity set' });
 
     if (!fields.env.trim()) tags.push({ cls: 'bl-tag-amber', label: 'No environment' });
-    else if (contentQuality(fields.env.trim()) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk env ⚠' });
-    else tags.push({ cls: 'bl-tag-green', label: 'Env ✓' });
+    else if (contentQuality(fields.env.trim()) === 'junk') tags.push({ cls: 'bl-tag-red', label: 'Junk environment' });
+    else tags.push({ cls: 'bl-tag-green', label: 'Env complete' });
     return tags;
   };
 
@@ -159,10 +166,10 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
 
     try {
       let parsed: AnalysisResult;
-      if (apiKey) {
-        parsed = await aiAnalysis(fields, apiKey);
+      if (useAi) {
+        parsed = await aiAnalysis(fields);
       } else {
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 350));
         parsed = ruleBasedAnalysis(fields);
       }
 
@@ -178,12 +185,28 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
       };
       setCurrentHistItem(histItem);
       onAddHistory(histItem);
-      toast(`✓ Analysis complete — score: ${parsed.overall_score}/100`);
+      toast(`Analysis complete — score: ${parsed.overall_score}/100`);
     } catch (e) {
-      setError(`⚠ ${e instanceof Error ? e.message : 'Analysis failed. Please try again.'}`);
+      setError(`${e instanceof Error ? e.message : 'Analysis failed. Please try again.'}`);
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const handleSaveDraft = () => {
+    const parsed = ruleBasedAnalysis(fields);
+    const draftItem: HistoryItem = {
+      id: Date.now(),
+      timestamp: Date.now(),
+      title: fields.title.trim() || 'Untitled Draft',
+      score: parsed.overall_score,
+      grade: gradeMeta(parsed.overall_score).label,
+      isDraft: true,
+      parsed,
+      fields,
+    };
+    onAddHistory(draftItem);
+    toast('Draft saved to history');
   };
 
   const handleClear = () => {
@@ -194,7 +217,7 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
   const handleSample = () => {
     const sample = getRandomSample();
     setFields(sample);
-    toast('📄 Sample loaded');
+    toast('Sample loaded');
   };
 
   const downloadFile = (content: string, filename: string, type: string) => {
@@ -214,14 +237,15 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
           <p className="bl-mono" style={{ fontSize: '.84rem', color: '#7a756e', marginTop: '.3rem' }}>// AI analysis · exception detection · downloadable reports</p>
         </div>
         <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="bl-btn-secondary" onClick={handleSample} data-testid="button-load-sample">📄 Load Sample</button>
-          <button className="bl-btn-secondary" onClick={handleClear}  data-testid="button-clear">✕ Clear</button>
+          <button className="bl-btn-secondary" onClick={handleSample} data-testid="button-load-sample" style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}><FileText size={14} /> Load Sample</button>
+          <button className="bl-btn-secondary" onClick={handleSaveDraft} data-testid="button-save-draft" style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}>Save Draft</button>
+          <button className="bl-btn-secondary" onClick={handleClear}  data-testid="button-clear" style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}><X size={14} /> Clear</button>
         </div>
       </div>
 
       {/* Report Identity */}
       <div className="bl-card">
-        <div className="bl-card-title">📋 Report Identity</div>
+        <div className="bl-card-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}><ClipboardList size={15} /> Report Identity</div>
         <div className="bl-field">
           <label className="bl-label">Bug Title <span style={{ color: '#c4410c' }}>*</span></label>
           <input className="bl-input" data-testid="input-title" value={fields.title} onChange={set('title')} placeholder="e.g. Login button unresponsive on Safari 17 with 2FA enabled" />
@@ -252,7 +276,7 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
 
       {/* Steps & Outcome */}
       <div className="bl-card">
-        <div className="bl-card-title">🔁 Steps & Outcome</div>
+        <div className="bl-card-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}><Repeat size={15} /> Steps &amp; Outcome</div>
         <div className="bl-field">
           <label className="bl-label">Steps to Reproduce <span style={{ color: '#c4410c' }}>*</span></label>
           <textarea className="bl-textarea" data-testid="input-steps" rows={4} value={fields.steps} onChange={set('steps')}
@@ -282,7 +306,7 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
 
       {/* Context & Classification */}
       <div className="bl-card">
-        <div className="bl-card-title">⚙️ Context & Classification</div>
+        <div className="bl-card-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}><Settings2 size={15} /> Context &amp; Classification</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.85rem' }}>
           <div className="bl-field" style={{ marginBottom: 0 }}>
             <label className="bl-label">Environment <span style={{ color: '#a09a92', fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '.7rem' }}>(recommended)</span></label>
@@ -293,11 +317,11 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
             <label className="bl-label">Severity</label>
             <select className="bl-select" data-testid="select-severity" value={fields.sev} onChange={set('sev')}>
               <option value="">— Select —</option>
-              <option value="Critical">🔴 Critical</option>
-              <option value="High">🟠 High</option>
-              <option value="Medium">🟡 Medium</option>
-              <option value="Low">🟢 Low</option>
-              <option value="Trivial">⚪ Trivial</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+              <option value="Trivial">Trivial</option>
             </select>
             <div style={{ marginTop: '.55rem' }}>
               <label className="bl-label">Priority</label>
@@ -366,8 +390,8 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
           </svg>
           {analyzing ? 'Analyzing...' : 'Analyze Report'}
         </button>
-        {!apiKey && (
-          <span className="bl-mono" style={{ fontSize: '.72rem', color: '#a09a92' }}>// Rule-based analysis · Add Anthropic API key for AI analysis</span>
+        {!useAi && (
+          <span className="bl-mono" style={{ fontSize: '.72rem', color: '#a09a92' }}>// Deterministic rule-based analysis · Enable optional AI in Settings</span>
         )}
       </div>
 
@@ -393,45 +417,62 @@ export function AnalyzerPage({ user, onAddHistory, onShareToTeam, apiKey }: Prop
             result={result}
             title={fields.title}
             excRaw={fields.exc}
-            onCreateJira={() => setShowJiraModal(true)}
-            onShareToTeam={currentHistItem && onShareToTeam
-              ? () => { onShareToTeam(currentHistItem); }
-              : undefined
-            }
+            duplicates={duplicates}
+            onSelectDuplicate={item => setDupModalItem(item)}
+            onUpdateCategory={(cat: DefectCategory) => {
+              const updated = { ...result, defect_category: cat };
+              setResult(updated);
+              if (currentHistItem && onUpdateHistory) {
+                const nextItem = { ...currentHistItem, parsed: updated };
+                setCurrentHistItem(nextItem);
+                onUpdateHistory(nextItem);
+              }
+            }}
+            onUpdateRewrite={(text: string) => {
+              const updated = { ...result, rewritten_report: text };
+              setResult(updated);
+              if (currentHistItem && onUpdateHistory) {
+                const nextItem = { ...currentHistItem, parsed: updated };
+                setCurrentHistItem(nextItem);
+                onUpdateHistory(nextItem);
+              }
+            }}
             onDownloadTXT={() => {
               downloadFile(result.rewritten_report, `${safeFilename(fields.title)}_report.txt`, 'text/plain');
-              toast('⬇ Downloaded TXT');
+              toast('Downloaded TXT');
             }}
             onDownloadMD={() => {
               const gm = gradeMeta(result.overall_score);
               const md = `# Bug Report: ${fields.title}\n\n**Score:** ${result.overall_score}/100  **Grade:** ${gm.label}\n\n---\n\n${result.rewritten_report}`;
               downloadFile(md, `${safeFilename(fields.title)}_report.md`, 'text/markdown');
-              toast('⬇ Downloaded MD');
+              toast('Downloaded MD');
             }}
             onDownloadHTML={() => {
               const gm = gradeMeta(result.overall_score);
               const c = scoreColor(result.overall_score);
-              const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Bug Report</title><style>body{font-family:Georgia,serif;max-width:740px;margin:2rem auto;padding:1.5rem;color:#1a1714;background:#f5f2ee}h1{font-size:1.5rem;margin-bottom:.5rem}.meta{font-family:monospace;font-size:.78rem;color:#7a756e;margin-bottom:1.4rem;padding-bottom:.9rem;border-bottom:1px solid #d4cfc5}.chip{display:inline-block;padding:.28rem .85rem;border-radius:20px;font-family:monospace;font-weight:700;color:${c};background:#f5f2ee;border:2px solid ${c};margin-right:.45rem}.grade{display:inline-block;padding:.22rem .75rem;border-radius:12px;font-family:monospace;font-size:.78rem;font-weight:600;background:${gm.bg};color:${gm.color}}pre{background:#f0ede7;border:1px solid #d4cfc5;border-radius:8px;padding:1.1rem;font-family:monospace;font-size:.8rem;line-height:1.8;white-space:pre-wrap;margin-top:1.1rem}.foot{margin-top:1.8rem;padding-top:.9rem;border-top:1px solid #d4cfc5;font-size:.72rem;color:#a09a92;font-family:monospace}</style></head><body><h1>Bug Report</h1><div class="meta">Generated by BugLens · ${new Date().toLocaleString()} · ${user.name}</div><span class="chip">${result.overall_score}/100</span><span class="grade">${gm.label}</span><pre>${result.rewritten_report.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre><div class="foot">BugLens Defect Quality Checker</div></body></html>`;
+              const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Bug Report</title><style>body{font-family:Georgia,serif;max-width:740px;margin:2rem auto;padding:1.5rem;color:#1a1714;background:#f5f2ee}h1{font-size:1.5rem;margin-bottom:.5rem}.meta{font-family:monospace;font-size:.78rem;color:#7a756e;margin-bottom:1.4rem;padding-bottom:.9rem;border-bottom:1px solid #d4cfc5}.chip{display:inline-block;padding:.28rem .85rem;border-radius:20px;font-family:monospace;font-weight:700;color:${c};background:#f5f2ee;border:2px solid ${c};margin-right:.45rem}.grade{display:inline-block;padding:.22rem .75rem;border-radius:12px;font-family:monospace;font-size:.78rem;font-weight:600;background:${gm.bg};color:${gm.color}}pre{background:#f0ede7;border:1px solid #d4cfc5;border-radius:8px;padding:1.1rem;font-family:monospace;font-size:.8rem;line-height:1.8;white-space:pre-wrap;margin-top:1.1rem}.foot{margin-top:1.8rem;padding-top:.9rem;border-top:1px solid #d4cfc5;font-size:.72rem;color:#a09a92;font-family:monospace}</style></head><body><h1>Bug Report</h1><div class="meta">Generated by BugLens · ${new Date().toLocaleString()} · ${user.name}</div><span class="chip">${result.overall_score}/100</span><span class="grade">${gm.label}</span><pre>${result.rewritten_report.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre><div class="foot">BugLens Defect Quality Intelligence</div></body></html>`;
               downloadFile(html, `${safeFilename(fields.title)}_report.html`, 'text/html');
-              toast('⬇ Downloaded HTML');
+              toast('Downloaded HTML');
             }}
             onDownloadJSON={() => {
               const gm = gradeMeta(result.overall_score);
               const out = { meta: { generated: new Date().toISOString(), analyst: user.name, tool: 'BugLens' }, title: fields.title, score: result.overall_score, grade: gm.label, ...result };
               downloadFile(JSON.stringify(out, null, 2), `${safeFilename(fields.title)}_analysis.json`, 'application/json');
-              toast('⬇ Downloaded JSON');
+              toast('Downloaded JSON');
+            }}
+            onDownloadPDF={() => {
+              const gm = gradeMeta(result.overall_score);
+              const win = window.open('', '_blank', 'width=820,height=900');
+              if (!win) { toast('Allow popups to export PDF'); return; }
+              win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${fields.title || 'Defect Report'}</title><style>body{font-family:Georgia,serif;max-width:740px;margin:2rem auto;padding:1.5rem;color:#1a1714}h1{font-size:1.5rem;margin-bottom:.4rem}.meta{font-family:monospace;font-size:.78rem;color:#555;margin-bottom:1.2rem;padding-bottom:.8rem;border-bottom:1px solid #ccc}pre{background:#f7f5f2;border:1px solid #ddd;border-radius:6px;padding:1rem;font-family:monospace;font-size:.8rem;line-height:1.7;white-space:pre-wrap}@media print{body{margin:0}}</style></head><body><h1>BugLens Defect Report</h1><div class="meta">Generated ${new Date().toLocaleString()} · Analyst: ${user.name} (${user.role}) · Score: ${result.overall_score}/100 (${gm.label})</div><pre>${result.rewritten_report.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre><script>window.onload=()=>{window.print();}</script></body></html>`);
+              win.document.close();
             }}
           />
         </div>
       )}
 
-      {/* Jira create modal */}
-      {showJiraModal && result && (
-        <JiraCreateModal
-          result={result}
-          title={fields.title}
-          onClose={() => setShowJiraModal(false)}
-        />
+      {dupModalItem && (
+        <ResultsModal item={dupModalItem} user={user} onClose={() => setDupModalItem(null)} />
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { ResultsPanel } from './ResultsPanel';
 import { gradeMeta, scoreColor } from '../lib/analysis';
 import { useToastTrigger } from '../components/Toast';
+import { X } from 'lucide-react';
 import type { HistoryItem, User } from '../lib/types';
 
 interface Props {
@@ -32,10 +33,11 @@ export function ResultsModal({ item, user, onClose }: Props) {
         <button
           onClick={onClose}
           data-testid="button-modal-close"
+          aria-label="Close modal"
           style={{ float: 'right', fontSize: '1.3rem', cursor: 'pointer', color: '#a09a92', background: 'none', border: 'none', lineHeight: 1 }}
           onMouseEnter={e => e.currentTarget.style.color = '#1a1714'}
           onMouseLeave={e => e.currentTarget.style.color = '#a09a92'}
-        >✕</button>
+        ><X size={18} /></button>
         <h2 className="bl-serif" style={{ fontSize: '1.35rem', marginBottom: '.28rem', paddingRight: '2rem' }}>{item.title}</h2>
         <div className="bl-mono" style={{ fontSize: '.76rem', color: '#a09a92', marginBottom: '1.1rem', paddingBottom: '.9rem', borderBottom: '1px solid #d4cfc5' }}>
           {new Date(item.timestamp).toLocaleString()} · {user.name} ({user.role})
@@ -65,7 +67,14 @@ export function ResultsModal({ item, user, onClose }: Props) {
             const gm = gradeMeta(item.score);
             const out = { meta: { generated: new Date().toISOString(), analyst: user.name, tool: 'BugLens' }, title: item.title, score: item.score, grade: gm.label, ...item.parsed };
             downloadFile(JSON.stringify(out, null, 2), `${safeFilename(item.title)}_analysis.json`, 'application/json');
-            toast('⬇ Downloaded JSON');
+            toast('Downloaded JSON');
+          }}
+          onDownloadPDF={() => {
+            const gm = gradeMeta(item.score);
+            const win = window.open('', '_blank', 'width=820,height=900');
+            if (!win) { toast('Allow popups to export PDF'); return; }
+            win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${item.title || 'Defect Report'}</title><style>body{font-family:Georgia,serif;max-width:740px;margin:2rem auto;padding:1.5rem;color:#1a1714}h1{font-size:1.5rem;margin-bottom:.4rem}.meta{font-family:monospace;font-size:.78rem;color:#555;margin-bottom:1.2rem;padding-bottom:.8rem;border-bottom:1px solid #ccc}pre{background:#f7f5f2;border:1px solid #ddd;border-radius:6px;padding:1rem;font-family:monospace;font-size:.8rem;line-height:1.7;white-space:pre-wrap}@media print{body{margin:0}}</style></head><body><h1>BugLens Defect Report</h1><div class="meta">Generated ${new Date(item.timestamp).toLocaleString()} · Analyst: ${user.name} (${user.role}) · Score: ${item.score}/100 (${gm.label})</div><pre>${(item.parsed?.rewritten_report || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre><script>window.onload=()=>{window.print();}</script></body></html>`);
+            win.document.close();
           }}
         />
       </div>

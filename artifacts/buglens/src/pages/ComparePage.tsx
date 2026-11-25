@@ -3,6 +3,7 @@ import { scoreColor, gradeMeta, timeAgo } from '../lib/analysis';
 import { SECTION_META } from '../lib/types';
 import { useToastTrigger } from '../components/Toast';
 import { ScoreRing } from '../components/ScoreRing';
+import { Zap, Check } from 'lucide-react';
 import type { HistoryItem } from '../lib/types';
 
 interface Props {
@@ -63,14 +64,27 @@ export function ComparePage({ history }: Props) {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.7rem', marginTop: '1.1rem' }}>
-              <button className="bl-btn-primary" onClick={doCompare} data-testid="button-compare">
-                ⚡ Compare
+              <button className="bl-btn-primary" onClick={doCompare} data-testid="button-compare" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
+                <Zap size={14} /> Compare
               </button>
             </div>
           </div>
 
           {compared && A && B && (
             <div className="bl-result-enter">
+              {/* Score Delta Banner */}
+              <div className="bl-card" style={{ padding: '.85rem 1.15rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem' }}>
+                <span className="bl-mono" style={{ fontSize: '.78rem', color: '#4a4540' }}>
+                  Score Difference:{' '}
+                  <strong style={{ color: A.score === B.score ? '#7a756e' : '#1d6b4e' }}>
+                    {A.score === B.score ? '0 points (Tie)' : `${Math.abs(A.score - B.score)} points higher in Report ${winner}`}
+                  </strong>
+                </span>
+                <span className="bl-mono" style={{ fontSize: '.72rem', color: '#a09a92' }}>
+                  {A.score} vs {B.score} / 100
+                </span>
+              </div>
+
               {/* Side-by-side panels */}
               <div className="bl-compare-grid">
                 {[{ report: A, label: 'A', isWinner: winner === 'A' }, { report: B, label: 'B', isWinner: winner === 'B' }].map(({ report, label, isWinner }) => {
@@ -80,7 +94,7 @@ export function ComparePage({ history }: Props) {
                     <div className="bl-compare-panel" key={label} data-testid={`compare-panel-${label}`}>
                       <h4 className="bl-mono" style={{ fontSize: '.7rem', color: '#a09a92', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                         Report {label}
-                        {isWinner && <span style={{ display: 'inline-block', padding: '.18rem .6rem', borderRadius: 4, fontSize: '.67rem', fontFamily: "'DM Mono', monospace", fontWeight: 600, background: '#e8f5f0', color: '#1d6b4e' }}>Winner ✓</span>}
+                        {isWinner && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', padding: '.18rem .6rem', borderRadius: 4, fontSize: '.67rem', fontFamily: "'DM Mono', monospace", fontWeight: 600, background: '#e8f5f0', color: '#1d6b4e' }}>Winner <Check size={11} /></span>}
                       </h4>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.6rem' }}>
                         <ScoreRing score={report.score} size={72} />
@@ -93,7 +107,11 @@ export function ComparePage({ history }: Props) {
                       {report.parsed?.risk_level && (
                         <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', marginTop: '.5rem' }}>
                           <span className={`bl-tag ${report.parsed.risk_level === 'High' ? 'bl-tag-red' : report.parsed.risk_level === 'Medium' ? 'bl-tag-amber' : 'bl-tag-green'}`}>Risk: {report.parsed.risk_level}</span>
-                          {report.parsed.recommended_assignee && <span className="bl-tag bl-tag-blue">→ {report.parsed.recommended_assignee}</span>}
+                          {report.parsed.defect_category && <span className="bl-tag bl-tag-blue">{report.parsed.defect_category}</span>}
+                          {(report.parsed.suggested_severity || report.fields?.sev) && (
+                            <span className="bl-tag bl-tag-amber">Sev: {report.parsed.suggested_severity || report.fields?.sev}</span>
+                          )}
+                          {report.parsed.recommended_assignee && <span className="bl-tag bl-tag-blue">{report.parsed.recommended_assignee}</span>}
                         </div>
                       )}
                     </div>
@@ -134,6 +152,41 @@ export function ComparePage({ history }: Props) {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Missing Info & Recommendations Comparison */}
+              <div className="bl-compare-grid" style={{ marginTop: '1rem' }}>
+                {[{ report: A, label: 'A' }, { report: B, label: 'B' }].map(({ report, label }) => (
+                  <div className="bl-compare-panel" key={`details-${label}`}>
+                    <div className="bl-mono" style={{ fontSize: '.7rem', color: '#a09a92', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.6rem' }}>
+                      Report {label} — Gaps &amp; Recommendations
+                    </div>
+                    <div style={{ fontSize: '.78rem', fontWeight: 600, color: '#1a1714', marginBottom: '.3rem' }}>
+                      Missing Information ({report.parsed?.missing_alerts?.length ?? 0})
+                    </div>
+                    {report.parsed?.missing_alerts?.length ? (
+                      <ul style={{ margin: '0 0 .75rem 1rem', padding: 0, fontSize: '.75rem', color: '#7a756e', lineHeight: 1.5 }}>
+                        {report.parsed.missing_alerts.slice(0, 4).map((a, idx) => (
+                          <li key={idx}><strong>{a.field}:</strong> {a.message}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="bl-mono" style={{ fontSize: '.74rem', color: '#1d6b4e', marginBottom: '.75rem' }}>No missing fields.</div>
+                    )}
+                    <div style={{ fontSize: '.78rem', fontWeight: 600, color: '#1a1714', marginBottom: '.3rem' }}>
+                      Recommendations ({report.parsed?.suggestions?.length ?? 0})
+                    </div>
+                    {report.parsed?.suggestions?.length ? (
+                      <ul style={{ margin: '0 0 0 1rem', padding: 0, fontSize: '.75rem', color: '#4a4540', lineHeight: 1.5 }}>
+                        {report.parsed.suggestions.slice(0, 3).map((s, idx) => (
+                          <li key={idx}>{s}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="bl-mono" style={{ fontSize: '.74rem', color: '#a09a92' }}>None.</div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

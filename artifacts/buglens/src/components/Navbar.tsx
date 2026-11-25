@@ -1,22 +1,22 @@
 import type { User, AppView } from '../lib/types';
+import { Search, Scale, History, BarChart3, Settings, type LucideIcon } from 'lucide-react';
 
 interface Props {
   user: User;
   activeView: AppView;
   onViewChange: (v: AppView) => void;
   onLogout: () => void;
-  teamCount?: number;
 }
 
-const TABS: { id: AppView; label: string; icon: string }[] = [
-  { id: 'checker',   label: 'Analyzer',  icon: '🔍' },
-  { id: 'compare',   label: 'Compare',   icon: '⚖️' },
-  { id: 'history',   label: 'History',   icon: '📋' },
-  { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { id: 'jira',      label: 'Jira',      icon: '🔗' },
+const TABS: { id: AppView; label: string; Icon: LucideIcon }[] = [
+  { id: 'checker',   label: 'Analyzer',  Icon: Search },
+  { id: 'compare',   label: 'Compare',   Icon: Scale },
+  { id: 'history',   label: 'History',   Icon: History },
+  { id: 'dashboard', label: 'Dashboard', Icon: BarChart3 },
+  { id: 'settings',  label: 'Settings',  Icon: Settings },
 ];
 
-export function Navbar({ user, activeView, onViewChange, onLogout, teamCount = 0 }: Props) {
+export function Navbar({ user, activeView, onViewChange, onLogout }: Props) {
   return (
     <nav style={{
       background: '#fffefb',
@@ -49,7 +49,8 @@ export function Navbar({ user, activeView, onViewChange, onLogout, teamCount = 0
         {/* Tabs */}
         {TABS.map(tab => {
           const isActive = activeView === tab.id;
-                  return (
+          const Icon = tab.Icon;
+          return (
             <button
               key={tab.id}
               onClick={() => onViewChange(tab.id)}
@@ -63,12 +64,12 @@ export function Navbar({ user, activeView, onViewChange, onLogout, teamCount = 0
                 fontFamily: "'Outfit', sans-serif",
                 transition: 'all .12s',
                 position: 'relative',
-                display: 'flex', alignItems: 'center', gap: '.28rem',
+                display: 'flex', alignItems: 'center', gap: '.35rem',
               }}
               onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = '#f0ede7'; e.currentTarget.style.color = '#1a1714'; } }}
               onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#7a756e'; } }}
             >
-              <span style={{ fontSize: '.75rem' }}>{tab.icon}</span>
+              <Icon size={14} strokeWidth={2} />
               {tab.label}
             </button>
           );

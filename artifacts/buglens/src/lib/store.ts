@@ -1,15 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { HistoryItem, User, TeamFeedItem, TeamComment } from './types';
+import type { HistoryItem, User } from './types';
 
 const BUILTIN_USERS: Record<string, { password: string; role: string; name: string }> = {
-  admin:    { password: 'admin123', role: 'Admin',     name: 'Alex Admin' },
-  qa_lead:  { password: 'qa1234',   role: 'QA Lead',   name: 'Quinn Arora' },
-  dev_user: { password: 'dev5678',  role: 'Developer', name: 'Dev Patel' },
-  analyst:  { password: 'pass2024', role: 'Analyst',   name: 'Ana Silva' },
+  admin:    { password: 'admin123', role: 'Administrator',      name: 'Alex Admin' },
+  qa_lead:  { password: 'qa1234',   role: 'QA Lead',            name: 'Quinn Arora' },
+  dev_user: { password: 'dev5678',  role: 'Software Developer', name: 'Dev Patel' },
+  analyst:  { password: 'pass2024', role: 'Business Analyst',   name: 'Ana Silva' },
 };
 
-const USERS_STORE_KEY   = 'bl_registered_users';
-const TEAM_FEED_KEY     = 'bl_team_feed';
+const USERS_STORE_KEY = 'bl_registered_users';
 
 function loadRegisteredUsers(): Record<string, { password: string; role: string; name: string }> {
   try {
@@ -22,61 +21,82 @@ function saveRegisteredUsers(users: Record<string, { password: string; role: str
   localStorage.setItem(USERS_STORE_KEY, JSON.stringify(users));
 }
 
-function loadTeamFeedFromStorage(): TeamFeedItem[] {
+function loadLocalHistory(username: string): HistoryItem[] {
   try {
-    const raw = localStorage.getItem(TEAM_FEED_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const saved = localStorage.getItem(`bl_${username}`);
+    return saved ? JSON.parse(saved) : [];
   } catch { return []; }
 }
 
-function saveTeamFeed(feed: TeamFeedItem[]) {
-  localStorage.setItem(TEAM_FEED_KEY, JSON.stringify(feed));
-}
-
 export function useAppStore() {
-  const [user, setUser]         = useState<User | null>(null);
-  const [history, setHistory]   = useState<HistoryItem[]>([]);
-  const [teamFeed, setTeamFeed] = useState<TeamFeedItem[]>(loadTeamFeedFromStorage);
+  const [user, setUser]       = useState<User | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const fresh = loadTeamFeedFromStorage();
-      setTeamFeed(prev => {
-        if (JSON.stringify(prev) !== JSON.stringify(fresh)) return fresh;
-        return prev;
-      });
-    }, 3000);
-    return () => clearInterval(interval);
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(async res => {
+        if (!res.ok) return;
+        const data = await res.json() as { user?: User };
+        if (!data.user) return;
+        setUser(data.user);
+        const repRes = await fetch('/api/reports', { credentials: 'include' });
+        if (repRes.ok) {
+          const repData = await repRes.json() as { reports?: HistoryItem[] };
+          if (Array.isArray(repData.reports)) {
+            setHistory(repData.reports);
+            localStorage.setItem(`bl_${data.user.username}`, JSON.stringify(repData.reports));
+            return;
+          }
+        }
+        setHistory(loadLocalHistory(data.user.username));
+      })
+      .catch(() => {});
   }, []);
 
-  const resolveUser = (username: string): { password: string; role: string; name: string } | undefined => {
-    const builtin = BUILTIN_USERS[username];
-    if (builtin) return builtin;
-    const registered = loadRegisteredUsers();
-    return registered[username];
-  };
+  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { user: User };
+        setUser(data.user);
+        const repRes = await fetch('/api/reports', { credentials: 'include' });
+        if (repRes.ok) {
+          const repData = await repRes.json() as { reports?: HistoryItem[] };
+          if (Array.isArray(repData.reports)) {
+            setHistory(repData.reports);
+            localStorage.setItem(`bl_${data.user.username}`, JSON.stringify(repData.reports));
+            return true;
+          }
+        }
+        setHistory(loadLocalHistory(data.user.username));
+        return true;
+      }
+      if (res.status === 401 || res.status === 400) return false;
+    } catch {
+      // Offline fallback below
+    }
 
-  const login = useCallback((username: string, password: string): boolean => {
-    const u = resolveUser(username);
+    const u = BUILTIN_USERS[username] || loadRegisteredUsers()[username];
     if (u && u.password === password) {
       const cu: User = { username, role: u.role, name: u.name };
       setUser(cu);
-      try {
-        const saved = localStorage.getItem(`bl_${username}`);
-        setHistory(saved ? JSON.parse(saved) : []);
-      } catch { setHistory([]); }
-      setTeamFeed(loadTeamFeedFromStorage());
+      setHistory(loadLocalHistory(username));
       return true;
     }
     return false;
   }, []);
 
-  const signup = useCallback((
+  const signup = useCallback(async (
     username: string,
     password: string,
     name: string,
     role: string
-  ): { ok: boolean; error?: string } => {
+  ): Promise<{ ok: boolean; error?: string }> => {
     if (!username.trim() || !password.trim() || !name.trim()) {
       return { ok: false, error: 'Username, password, and name are required.' };
     }
@@ -86,6 +106,27 @@ export function useAppStore() {
     if (password.length < 6) {
       return { ok: false, error: 'Password must be at least 6 characters.' };
     }
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password, name: name.trim(), role }),
+      });
+      const data = await res.json().catch(() => ({})) as { user?: User; error?: string };
+      if (res.ok && data.user) {
+        setUser(data.user);
+        setHistory([]);
+        return { ok: true };
+      }
+      if (res.status === 400 || res.status === 409) {
+        return { ok: false, error: data.error || 'Signup failed.' };
+      }
+    } catch {
+      // Offline fallback below
+    }
+
     if (BUILTIN_USERS[username]) {
       return { ok: false, error: 'That username is already taken.' };
     }
@@ -98,11 +139,11 @@ export function useAppStore() {
     const cu: User = { username, role, name: name.trim() };
     setUser(cu);
     setHistory([]);
-    setTeamFeed(loadTeamFeedFromStorage());
     return { ok: true };
   }, []);
 
   const logout = useCallback(() => {
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     setUser(null);
     setHistory([]);
   }, []);
@@ -113,6 +154,26 @@ export function useAppStore() {
       localStorage.setItem(`bl_${username}`, JSON.stringify(next));
       return next;
     });
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(item),
+    }).catch(() => {});
+  }, []);
+
+  const updateHistoryItem = useCallback((item: HistoryItem, username: string) => {
+    setHistory(prev => {
+      const next = prev.map(h => (h.id === item.id ? item : h));
+      localStorage.setItem(`bl_${username}`, JSON.stringify(next));
+      return next;
+    });
+    fetch(`/api/reports/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ parsed: item.parsed, isDraft: item.isDraft }),
+    }).catch(() => {});
   }, []);
 
   const deleteFromHistory = useCallback((id: number, username: string) => {
@@ -121,65 +182,24 @@ export function useAppStore() {
       localStorage.setItem(`bl_${username}`, JSON.stringify(next));
       return next;
     });
+    fetch(`/api/reports/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    }).catch(() => {});
   }, []);
 
   const clearHistory = useCallback((username: string) => {
     localStorage.setItem(`bl_${username}`, '[]');
     setHistory([]);
-  }, []);
-
-  const shareToTeam = useCallback((item: HistoryItem, sharedBy: User): boolean => {
-    const existing = loadTeamFeedFromStorage();
-    const alreadyShared = existing.some(f => f.id === item.id);
-    if (alreadyShared) return false;
-    const feedItem: TeamFeedItem = {
-      id: item.id,
-      timestamp: Date.now(),
-      sharedBy,
-      reportTitle: item.title,
-      score: item.score,
-      grade: item.grade,
-      parsed: item.parsed,
-      fields: item.fields,
-      comments: [],
-    };
-    const next = [feedItem, ...existing].slice(0, 100);
-    saveTeamFeed(next);
-    setTeamFeed(next);
-    return true;
-  }, []);
-
-  const addComment = useCallback((feedId: number, text: string, commenter: User) => {
-    setTeamFeed(prev => {
-      const next = prev.map(item => {
-        if (item.id !== feedId) return item;
-        const comment: TeamComment = {
-          id: Date.now(),
-          timestamp: Date.now(),
-          username: commenter.username,
-          name: commenter.name,
-          role: commenter.role,
-          text,
-        };
-        return { ...item, comments: [...item.comments, comment] };
-      });
-      saveTeamFeed(next);
-      return next;
-    });
-  }, []);
-
-  const removeFromTeamFeed = useCallback((feedId: number) => {
-    setTeamFeed(prev => {
-      const next = prev.filter(f => f.id !== feedId);
-      saveTeamFeed(next);
-      return next;
-    });
+    fetch('/api/reports', {
+      method: 'DELETE',
+      credentials: 'include',
+    }).catch(() => {});
   }, []);
 
   return {
-    user, history, teamFeed,
+    user, history,
     login, signup, logout,
-    addToHistory, deleteFromHistory, clearHistory,
-    shareToTeam, addComment, removeFromTeamFeed,
+    addToHistory, updateHistoryItem, deleteFromHistory, clearHistory,
   };
 }

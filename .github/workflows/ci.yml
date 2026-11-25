@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --config.strict-dep-builds=false
+
+      - name: Typecheck libraries, frontend, and backend
+        run: |
+          pnpm run typecheck:libs
+          pnpm --filter @workspace/buglens run typecheck
+          pnpm --filter @workspace/api-server run typecheck
+
+      - name: Run unit and component tests
+        run: pnpm --filter @workspace/buglens run test
+
+      - name: Build frontend and backend
+        env:
+          PORT: "3000"
+          BASE_PATH: "/"
+        run: |
+          pnpm --filter @workspace/buglens run build
+          pnpm --filter @workspace/api-server run build
+

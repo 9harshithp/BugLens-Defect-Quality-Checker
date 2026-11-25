@@ -6,7 +6,7 @@ import { ComparePage } from './pages/ComparePage';
 import { HistoryPage } from './pages/HistoryPage';
 import { DashboardPage } from './pages/DashboardPage';
 
-import { JiraPage } from './pages/JiraPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ToastProvider, useToastTrigger } from './components/Toast';
 import { useAppStore } from './lib/store';
 import type { AppView } from './lib/types';
@@ -15,9 +15,10 @@ function AppContent() {
   const {
     user, history,
     login, signup, logout,
-    addToHistory, deleteFromHistory, clearHistory,
+    addToHistory, updateHistoryItem, deleteFromHistory, clearHistory,
   } = useAppStore();
   const [view, setView] = useState<AppView>('checker');
+  const [useAi, setUseAi] = useState(false);
   const toast = useToastTrigger();
 
   if (!user) {
@@ -61,7 +62,10 @@ function AppContent() {
           {view === 'checker' && (
             <AnalyzerPage
               user={user}
+              history={history}
+              useAi={useAi}
               onAddHistory={item => addToHistory(item, user.username)}
+              onUpdateHistory={item => updateHistoryItem(item, user.username)}
             />
           )}
           {view === 'compare' && (
@@ -78,7 +82,9 @@ function AppContent() {
           {view === 'dashboard' && (
             <DashboardPage history={history} user={user} />
           )}
-          {view === 'jira' && <JiraPage />}
+          {view === 'settings' && (
+            <SettingsPage user={user} useAi={useAi} onToggleAi={setUseAi} />
+          )}
         </main>
       </div>
     </div>

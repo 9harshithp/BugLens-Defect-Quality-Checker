@@ -1,18 +1,19 @@
 import { useState } from 'react';
+import { USER_ROLES } from '../lib/types';
 
 interface Props {
-  onLogin: (username: string, password: string) => boolean;
-  onSignup: (username: string, password: string, name: string, role: string) => { ok: boolean; error?: string };
+  onLogin: (username: string, password: string) => Promise<boolean> | boolean;
+  onSignup: (username: string, password: string, name: string, role: string) => Promise<{ ok: boolean; error?: string }> | { ok: boolean; error?: string };
 }
 
 const DEMO_ACCOUNTS = [
-  { role: 'Admin',     username: 'admin',    password: 'admin123' },
-  { role: 'QA Lead',   username: 'qa_lead',  password: 'qa1234'   },
-  { role: 'Developer', username: 'dev_user', password: 'dev5678'  },
-  { role: 'Analyst',   username: 'analyst',  password: 'pass2024' },
+  { role: 'Administrator',      username: 'admin',    password: 'admin123' },
+  { role: 'QA Lead',            username: 'qa_lead',  password: 'qa1234'   },
+  { role: 'Software Developer', username: 'dev_user', password: 'dev5678'  },
+  { role: 'Business Analyst',   username: 'analyst',  password: 'pass2024' },
 ];
 
-const ROLES = ['QA Engineer', 'QA Lead', 'Developer', 'Analyst', 'Admin', 'Product Manager', 'DevOps'];
+const ROLES = [...USER_ROLES];
 
 export function LoginPage({ onLogin, onSignup }: Props) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -29,14 +30,14 @@ export function LoginPage({ onLogin, onSignup }: Props) {
   const [signRole, setSignRole]   = useState('QA Engineer');
   const [signError, setSignError] = useState('');
 
-  const handleLogin = (u = loginUser, p = loginPass) => {
-    const ok = onLogin(u, p);
+  const handleLogin = async (u = loginUser, p = loginPass) => {
+    const ok = await onLogin(u, p);
     if (!ok) { setLoginError('Invalid username or password.'); setLoginPass(''); }
     else setLoginError('');
   };
 
-  const handleSignup = () => {
-    const res = onSignup(signUser.trim(), signPass, signName.trim(), signRole);
+  const handleSignup = async () => {
+    const res = await onSignup(signUser.trim(), signPass, signName.trim(), signRole);
     if (!res.ok) { setSignError(res.error || 'Signup failed.'); }
     else setSignError('');
   };
