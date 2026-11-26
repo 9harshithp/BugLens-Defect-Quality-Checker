@@ -267,22 +267,63 @@ Supported test categories:
 
 ---
 
-## System Architecture
+## 🏗️ System Architecture
+
+BugLens combines a deterministic defect quality analysis engine
+with optional AI-assisted analysis and persistent report management.
+
+```mermaid
+flowchart TB
+    U["QA Engineers and Developers"] --> F["React / TypeScript"]
+    F --> E["Rule-Based Analysis Engine"]
+    F -->|REST API| B["Express 5 Backend"]
+
+    E --> R["Quality Scoring and Classification"]
+    R --> O["Structured Analysis Results"]
+
+    B --> A["Session Authentication"]
+    B --> P["Report and History Management"]
+    B --> AI["AI Analysis Service"]
+
+    A --> DB[("PostgreSQL / Drizzle ORM")]
+    P --> DB
+    AI --> C["Anthropic API"]
+    AI -->|Fallback| E
+    C --> O
+    O --> F
+```
+
+### Defect Analysis Workflow
 
 ```mermaid
 flowchart TD
-    U["QA Engineers and Developers"] --> F["React frontend"]
-    F --> R["Rule-based analysis engine"]
-    F -->|REST API| B["Express 5 backend"]
-    B --> A["Session authentication"]
-    B --> V["Zod validation"]
-    V --> L["Application services"]
-    L --> D["Drizzle ORM"]
-    D --> P[("PostgreSQL")]
-    L --> AI["Optional Anthropic API"]
-    R --> O["Analysis results"]
-    AI --> O
+    A["Submit Defect Report"] --> B["Validate Input"]
+    B --> C["100-Point Quality Scoring"]
+    C --> D["Defect Classification"]
+    D --> E["Exception and Error Analysis"]
+    E --> F{"AI Enhancement Enabled?"}
+    F -->|Yes| G["Server-Side AI Analysis"]
+    F -->|No| H["Rule-Based Results"]
+    G -->|Success| I["Structured Report"]
+    G -->|Unavailable| H
+    H --> I
+    I --> J["BDD Scenarios and Recommendations"]
+    J --> K["Save, Compare or Export"]
 ```
+
+### Engineering Design
+
+| Design decision | Purpose |
+|---|---|
+| Deterministic scoring engine | Consistent defect quality assessment |
+| Optional AI enhancement | Additional report improvement |
+| Automatic fallback | Analysis availability without external AI |
+| Zod validation | Structured request and response validation |
+| Scrypt password hashing | Password protection |
+| HttpOnly session cookies | Session management |
+| Drizzle ORM | Type-safe database operations |
+| PostgreSQL | Persistent report and analysis history |
+| GitHub Actions | Automated builds and testing |
 
 ### Architecture Highlights
 
